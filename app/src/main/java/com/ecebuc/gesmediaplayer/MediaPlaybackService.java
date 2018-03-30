@@ -1,5 +1,7 @@
 package com.ecebuc.gesmediaplayer;
 
+import android.app.Notification;
+import android.app.NotificationChannel;
 import android.app.PendingIntent;
 import android.content.BroadcastReceiver;
 import android.content.ComponentName;
@@ -14,13 +16,15 @@ import android.media.MediaPlayer;
 import android.media.session.MediaController;
 import android.media.session.MediaSession;
 import android.net.ConnectivityManager;
+import android.os.Build;
 import android.os.Bundle;
 import android.os.PowerManager;
 import android.os.ResultReceiver;
 import android.support.annotation.NonNull;
 import android.support.annotation.Nullable;
 import android.support.v4.media.session.MediaControllerCompat;
-import android.support.v7.app.NotificationCompat;
+//import android.support.v7.app.NotificationCompat;
+import android.support.v4.app.NotificationCompat;
 import android.support.v4.media.MediaMetadataCompat;
 import android.app.NotificationManager;
 import android.support.v4.media.MediaBrowserCompat;
@@ -64,6 +68,7 @@ public class MediaPlaybackService extends MediaBrowserServiceCompat implements
     public static final String ACTION_NEXT = "com.example.gesmediaplayer.ACTION_NEXT";
     public static final String ACTION_STOP = "com.example.gesmediaplayer.ACTION_STOP";
     public static final String NOTIFICATION_PLAYBACK = "com.example.gesmediaplayer.TRANSPORT_CONTROLS";
+    public static final String CHANNEL_ID = "com.example.gesmediaplayer.NOTIFICATION_CHANNEL_ID";
 
 
 
@@ -85,6 +90,24 @@ public class MediaPlaybackService extends MediaBrowserServiceCompat implements
                 .setActions(PlaybackStateCompat.ACTION_PLAY |
                             PlaybackStateCompat.ACTION_PLAY_PAUSE);
         gesMediaSession.setPlaybackState(playbackStateBuilder.build()); //translates to STATE_NONE
+
+        //create a notification channel for displaying notifications on API 26+
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            // Create the NotificationChannel
+            String name = "GES Notification Channel";
+            String description = "This is the GES Media Player notification channel - test";
+            int importance = NotificationManager.IMPORTANCE_DEFAULT;
+            long vibrationP[] = {0}; //to eliminate vibration for every command on notification
+
+            NotificationChannel mChannel = new NotificationChannel(CHANNEL_ID, name, importance);
+            mChannel.setDescription(description);
+            mChannel.setVibrationPattern(vibrationP);
+            // Register the channel with the system; you can't change the importance
+            // or other notification behaviors after this
+            NotificationManager notificationManager = (NotificationManager) getSystemService(
+                    NOTIFICATION_SERVICE);
+            notificationManager.createNotificationChannel(mChannel);
+        }
         Log.d("service onCreate: ", "exited service onCreate");
     }
     @Override
@@ -269,7 +292,7 @@ public class MediaPlaybackService extends MediaBrowserServiceCompat implements
                 Log.d("onPlay: ", "service was called to be started");
                 startService(new Intent(getApplicationContext(), MediaPlaybackService.class));
             }
-
+            
             if(gesMediaSession.getController().getPlaybackState().getState() == PlaybackStateCompat.STATE_PAUSED){
                 gesMediaSession.setActive(true);
                 gesMediaPlayer.start();
@@ -636,8 +659,8 @@ public class MediaPlaybackService extends MediaBrowserServiceCompat implements
                                                         playPauseSongIntent, 0);
         }
 
-        /*Bitmap largeIcon = BitmapFactory.decodeResource(getResources(),
-                R.drawable.default_player_cover); *///replace with your own default image/cover
+        Bitmap largeIcon = BitmapFactory.decodeResource(getResources(),
+                R.drawable.skepty_face); //replace with your own default image/cover
 
         //TODO this doesn't work for now - starting the activity when clicking the notification
         Intent notificationClickIntent = new Intent(this, MainActivity.class);
@@ -645,11 +668,11 @@ public class MediaPlaybackService extends MediaBrowserServiceCompat implements
         PendingIntent clickActivityStart = PendingIntent.getActivity(this, 0, notificationClickIntent ,0);
 
         NotificationCompat.Builder notificationBuilder = (NotificationCompat.Builder)
-                new NotificationCompat.Builder(this);
+                new NotificationCompat.Builder(this, CHANNEL_ID);
         notificationBuilder
                 // Enable launching the player by clicking the notification //TODO this doesn't work for now
-                //.setContentIntent(gesMediaSession.getController().getSessionActivity())
-                .setContentIntent(clickActivityStart)
+                .setContentIntent(gesMediaSession.getController().getSessionActivity())
+                //.setContentIntent(clickActivityStart)
 
                 // Stop the service when the notification is swiped away //TODO: not sure about this one
                 .setDeleteIntent(stopPendingIntent)
@@ -658,7 +681,7 @@ public class MediaPlaybackService extends MediaBrowserServiceCompat implements
                 .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
 
                 // Set the Notification style
-                .setStyle(new NotificationCompat.MediaStyle()
+                .setStyle(new android.support.v4.media.app.NotificationCompat.MediaStyle()
                         // Attach our MediaSession token - to display artwork in lock screen
                         .setMediaSession(gesMediaSession.getSessionToken())
                         // Show our playback controls in the compact notification view.
@@ -668,13 +691,14 @@ public class MediaPlaybackService extends MediaBrowserServiceCompat implements
                 .setColor(getResources().getColor(R.color.colorPrimaryDark))
 
                 // Set the large and small icons
-                //.setLargeIcon(largeIcon)
                 .setSmallIcon(android.R.drawable.stat_sys_headset)
+                .setLargeIcon(largeIcon)
 
                 // Set Notification content information
                 .setContentText(activeAudio.getArtist())
+                .setSubText(activeAudio.getAlbum())
                 .setContentTitle(activeAudio.getTitle())
-                .setContentInfo(activeAudio.getAlbum())
+                .setShowWhen(false) //don't display timestamp
 
                 .addAction(android.R.drawable.ic_media_previous, "Previous",
                         previousSongPendingIntent)
