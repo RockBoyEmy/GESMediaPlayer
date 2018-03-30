@@ -19,7 +19,6 @@ import android.os.Bundle;
 import android.util.Log;
 import android.view.View;
 import android.widget.Button;
-import android.widget.Toast;
 
 import java.util.ArrayList;
 
@@ -38,7 +37,9 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
 
     private MediaBrowserCompat gesMediaBrowser;
     private MediaControllerCompat gesMediaController;
-    public MediaControllerCompat.TransportControls gesPlaybackController;
+    private MediaControllerCompat.TransportControls gesPlaybackTransportControls;
+
+
 
     //-------------------------------Session and Controller Callbacks-----------------------------//
 
@@ -54,8 +55,8 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
 
                 //save the controller and define the easy access transport controls in the object
                 MediaControllerCompat.setMediaController(MainActivity.this, gesMediaController);
-                gesPlaybackController = gesMediaController.getTransportControls();
-                //gesPlaybackController.playFromMediaId(String.valueOf(R.raw.warner_tautz_off_broadway), null);
+                gesPlaybackTransportControls = gesMediaController.getTransportControls();
+                //gesPlaybackTransportControls.playFromMediaId(String.valueOf(R.raw.warner_tautz_off_broadway), null);
 
                 //Display initial state
                 MediaMetadataCompat metadata = gesMediaController.getMetadata();
@@ -79,7 +80,8 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
         @Override
         public void onConnectionSuspended() {
             // The Service has crashed. Disable transport controls until it automatically reconnects
-            gesPlaybackController = null;
+            Log.d("onConnectionSuspend: ", "the service has crashed");
+            gesPlaybackTransportControls = null;
         }
         @Override
         public void onConnectionFailed() {
@@ -117,6 +119,8 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
         }
     };
 
+
+
     //-----------------------------------Activity lifecycle methods-------------------------------//
 
     @Override
@@ -146,20 +150,18 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
 
             //initiate device scan for audio files and create a list for them
             loadAudio();
-
-            playPauseToggleButton.setOnClickListener(this);
         }
+
+        playPauseToggleButton.setOnClickListener(this);
         Log.d("onCreate: ", "exited onCreate");
     }
     @Override
     protected void onStart() {
         super.onStart();
-        //TODO: not entirely sure what is supposed to happen in here, seemingly connects on its own
         Log.d("onStart: ", "main activity onStart");
-       /* if(!gesMediaBrowser.isConnected() && MediaPlaybackService.isServiceStarted){
-            gesMediaBrowser.connect();
-        }
-        else*/ if(!MediaPlaybackService.isServiceStarted)
+
+        //bind to the service again if it was created and started and the user is returning to app
+        if(!MediaPlaybackService.isServiceStarted)
         {
             gesMediaBrowser = new MediaBrowserCompat(this,
                     new ComponentName(this, MediaPlaybackService.class),
@@ -189,26 +191,13 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
     protected void onDestroy() {
         super.onDestroy();
         Log.d("onDestroy: ", "entered onDestroy");
-        gesPlaybackController.stop();
+        gesPlaybackTransportControls.stop();
 
         gesMediaBrowser.disconnect();
         gesMediaBrowser = null;
         Log.d("onDestroy: ", "exited onDestroy");
     }
 
-    /*Not sure about the following if needed or not in this implementation of the application
-    * it will stay commented-out for now, implement in case of weird behavior and app crashes
-    * apparently this is how it will fix it, but check with old version, with binders*/
-    //@Override
-    //public void onSaveInstanceState(Bundle savedInstanceState) {
-    //    savedInstanceState.putBoolean("ServiceState", serviceBound);
-    //   super.onSaveInstanceState(savedInstanceState);
-    //}
-    //@Override
-    //public void onRestoreInstanceState(Bundle savedInstanceState) {
-    //    super.onRestoreInstanceState(savedInstanceState);
-    //    serviceBound = savedInstanceState.getBoolean("ServiceState");
-    //}
 
     @Override
     public void onClick(View v) {
@@ -216,11 +205,11 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
             case R.id.playPause_btn:
                 //has to be dealt with accordingly, based on the current state of mediaplayer
                 if( currentPlaybackState == STATE_PAUSED ) {
-                    gesPlaybackController.play();
+                    gesPlaybackTransportControls.play();
                     currentPlaybackState = STATE_PLAYING;
                 } else {
                     if( gesMediaController.getPlaybackState().getState() == PlaybackStateCompat.STATE_PLAYING ) {
-                        gesPlaybackController.pause();
+                        gesPlaybackTransportControls.pause();
                     }
                     currentPlaybackState = STATE_PAUSED;
                 }
@@ -231,6 +220,8 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
             //
         }
     }
+
+
 
     //-----------------------------------Audio file load methods----------------------------------//
 
@@ -265,6 +256,8 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
         Log.d("loadAudio: ", "exited loadAudio");
     }
 
+
+
     //------------------------------------------Permissions---------------------------------------//
     @Override
     public void onRequestPermissionsResult(int requestCode, String permissions[], int[] grantResults) {
@@ -282,16 +275,28 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
                             mediaBrowserCallbacks, getIntent().getExtras());
                     gesMediaBrowser.connect();
 
-                    playPauseToggleButton.setOnClickListener(this);
                 } else {
                     //close the app if permissions aren't granted
                     finish();
                 }
-                return;
             }
             // other 'case' lines to check for other
             // permissions this app might request.
         }
     }
 
+
+    /*Not sure about the following if needed or not in this implementation of the application
+     * it will stay commented-out for now, implement in case of weird behavior and app crashes
+     * apparently this is how it will fix it, but check with old version, with binders*/
+    //@Override
+    //public void onSaveInstanceState(Bundle savedInstanceState) {
+    //    savedInstanceState.putBoolean("ServiceState", serviceBound);
+    //   super.onSaveInstanceState(savedInstanceState);
+    //}
+    //@Override
+    //public void onRestoreInstanceState(Bundle savedInstanceState) {
+    //    super.onRestoreInstanceState(savedInstanceState);
+    //    serviceBound = savedInstanceState.getBoolean("ServiceState");
+    //}
 }
