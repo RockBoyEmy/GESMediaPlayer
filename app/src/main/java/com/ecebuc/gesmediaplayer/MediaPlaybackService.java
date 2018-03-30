@@ -1,6 +1,5 @@
 package com.ecebuc.gesmediaplayer;
 
-import android.app.Notification;
 import android.app.NotificationChannel;
 import android.app.PendingIntent;
 import android.content.BroadcastReceiver;
@@ -13,9 +12,6 @@ import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
 import android.media.AudioManager;
 import android.media.MediaPlayer;
-import android.media.session.MediaController;
-import android.media.session.MediaSession;
-import android.net.ConnectivityManager;
 import android.os.Build;
 import android.os.Bundle;
 import android.os.PowerManager;
@@ -23,7 +19,6 @@ import android.os.ResultReceiver;
 import android.support.annotation.NonNull;
 import android.support.annotation.Nullable;
 import android.support.v4.media.session.MediaControllerCompat;
-//import android.support.v7.app.NotificationCompat;
 import android.support.v4.app.NotificationCompat;
 import android.support.v4.media.MediaMetadataCompat;
 import android.app.NotificationManager;
@@ -67,7 +62,6 @@ public class MediaPlaybackService extends MediaBrowserServiceCompat implements
     public static final String ACTION_PREVIOUS = "com.example.gesmediaplayer.ACTION_PREVIOUS";
     public static final String ACTION_NEXT = "com.example.gesmediaplayer.ACTION_NEXT";
     public static final String ACTION_STOP = "com.example.gesmediaplayer.ACTION_STOP";
-    public static final String NOTIFICATION_PLAYBACK = "com.example.gesmediaplayer.TRANSPORT_CONTROLS";
     public static final String CHANNEL_ID = "com.example.gesmediaplayer.NOTIFICATION_CHANNEL_ID";
 
 
@@ -263,7 +257,7 @@ public class MediaPlaybackService extends MediaBrowserServiceCompat implements
         registerReceiver(audioLoadComplete, filter);
     }
     private void registerNotificationCommandReceiver(){
-        IntentFilter notificationFilter = new IntentFilter(NOTIFICATION_PLAYBACK);
+        IntentFilter notificationFilter = new IntentFilter();
         notificationFilter.addAction(ACTION_PLAY);
         notificationFilter.addAction(ACTION_PAUSE);
         notificationFilter.addAction(ACTION_NEXT);
@@ -292,16 +286,13 @@ public class MediaPlaybackService extends MediaBrowserServiceCompat implements
                 Log.d("onPlay: ", "service was called to be started");
                 startService(new Intent(getApplicationContext(), MediaPlaybackService.class));
             }
-            
+
             if(gesMediaSession.getController().getPlaybackState().getState() == PlaybackStateCompat.STATE_PAUSED){
                 gesMediaSession.setActive(true);
                 gesMediaPlayer.start();
                 setMediaPlaybackState(PlaybackStateCompat.STATE_PLAYING);
-                if(gesMediaSession.getController().getPlaybackState().getState() == PlaybackStateCompat.STATE_PLAYING){
-                    Log.d("onPlay: ", "state is playing");
-                }
-                createNotification();
                 registerNoisyReceiver();
+                createNotification();
             }
         }
         @Override
@@ -394,6 +385,7 @@ public class MediaPlaybackService extends MediaBrowserServiceCompat implements
             gesMediaSession.setActive(false);
             // stop the player (custom call)
             gesMediaPlayer.stop();
+            //stopForeground(true);
         }
         @Override
         public void onPlayFromMediaId(String mediaId, Bundle extras) {
@@ -454,10 +446,10 @@ public class MediaPlaybackService extends MediaBrowserServiceCompat implements
         PlaybackStateCompat.Builder playbackstateBuilder = new PlaybackStateCompat.Builder();
         if( state == PlaybackStateCompat.STATE_PLAYING ) {
             playbackstateBuilder.setActions(PlaybackStateCompat.ACTION_PLAY_PAUSE |
-                    PlaybackStateCompat.ACTION_PAUSE);
+                                            PlaybackStateCompat.ACTION_PAUSE);
         } else {
             playbackstateBuilder.setActions(PlaybackStateCompat.ACTION_PLAY_PAUSE |
-                    PlaybackStateCompat.ACTION_PLAY);
+                                            PlaybackStateCompat.ACTION_PLAY);
         }
         playbackstateBuilder.setState(state, PlaybackStateCompat.PLAYBACK_POSITION_UNKNOWN, 0);
         gesMediaSession.setPlaybackState(playbackstateBuilder.build());
@@ -620,19 +612,15 @@ public class MediaPlaybackService extends MediaBrowserServiceCompat implements
         Intent playPauseSongIntent = new Intent();
         Intent previousSongIntent = new Intent(ACTION_PREVIOUS);
         Intent nextSongIntent = new Intent(ACTION_NEXT);
-
         Intent stopIntent = new Intent(ACTION_STOP);
 
         PendingIntent playPauseSongPendingIntent = null;
-        PendingIntent stopPendingIntent = PendingIntent.getBroadcast(
-                                                        this, 0,
-                                                        stopIntent, 0);
-        PendingIntent previousSongPendingIntent = PendingIntent.getBroadcast(
-                                                        this, 0,
-                                                        previousSongIntent, 0);
-        PendingIntent nextSongPendingIntent = PendingIntent.getBroadcast(
-                                                        this, 0,
-                                                        nextSongIntent, 0);
+        PendingIntent stopPendingIntent = PendingIntent.getBroadcast(this, 0,
+                                                                    stopIntent, 0);
+        PendingIntent previousSongPendingIntent = PendingIntent.getBroadcast(this, 0,
+                                                                    previousSongIntent, 0);
+        PendingIntent nextSongPendingIntent = PendingIntent.getBroadcast(this, 0,
+                                                                    nextSongIntent, 0);
 
 
         PlaybackStateCompat state = gesMediaSession.getController().getPlaybackState();
@@ -646,17 +634,15 @@ public class MediaPlaybackService extends MediaBrowserServiceCompat implements
             Log.d("createNotification: ", "should be Paused");
             playPauseNotificationIcon = android.R.drawable.ic_media_play;
             playPauseSongIntent.setAction(ACTION_PLAY);
-            playPauseSongPendingIntent = PendingIntent.getBroadcast(
-                                                        this, 0,
-                                                        playPauseSongIntent, 0);
+            playPauseSongPendingIntent = PendingIntent.getBroadcast(this, 0,
+                                                                    playPauseSongIntent, 0);
 
         } if(state.getState() == PlaybackStateCompat.STATE_PLAYING){
             Log.d("createNotification: ", "should be Playing");
             playPauseNotificationIcon = android.R.drawable.ic_media_pause;
             playPauseSongIntent.setAction(ACTION_PAUSE);
-            playPauseSongPendingIntent = PendingIntent.getBroadcast(
-                                                        this, 0,
-                                                        playPauseSongIntent, 0);
+            playPauseSongPendingIntent = PendingIntent.getBroadcast(this, 0,
+                                                                    playPauseSongIntent, 0);
         }
 
         Bitmap largeIcon = BitmapFactory.decodeResource(getResources(),
@@ -674,7 +660,7 @@ public class MediaPlaybackService extends MediaBrowserServiceCompat implements
                 .setContentIntent(gesMediaSession.getController().getSessionActivity())
                 //.setContentIntent(clickActivityStart)
 
-                // Stop the service when the notification is swiped away //TODO: not sure about this one
+                // Stop the service when the notification is swiped away //TODO: not working, see cancelButton
                 .setDeleteIntent(stopPendingIntent)
 
                 // Make the transport controls visible on the lockscreen
@@ -685,7 +671,9 @@ public class MediaPlaybackService extends MediaBrowserServiceCompat implements
                         // Attach our MediaSession token - to display artwork in lock screen
                         .setMediaSession(gesMediaSession.getSessionToken())
                         // Show our playback controls in the compact notification view.
-                        .setShowActionsInCompactView(0, 1, 2))
+                        .setShowActionsInCompactView(0, 1, 2)
+                        /*.setShowCancelButton(true)
+                        .setCancelButtonIntent(stopPendingIntent)*/)
 
                 // Set the Notification color
                 .setColor(getResources().getColor(R.color.colorPrimaryDark))
@@ -707,54 +695,9 @@ public class MediaPlaybackService extends MediaBrowserServiceCompat implements
                         nextSongPendingIntent);
 
         //.build();
-
         ((NotificationManager) getSystemService(Context.NOTIFICATION_SERVICE))
                 .notify(NOTIFICATION_ID, notificationBuilder.build());
     }
-    /*private PendingIntent playbackAction(int actionNumber) {
-        Intent playbackAction = new Intent(this, MediaPlaybackService.class);
-        switch (actionNumber) {
-            case 0:
-                // Play
-                playbackAction.setAction(ACTION_PLAY);
-                return PendingIntent.getService(this, actionNumber, playbackAction, 0);
-            case 1:
-                // Pause
-                playbackAction.setAction(ACTION_PAUSE);
-                return PendingIntent.getService(this, actionNumber, playbackAction, 0);
-            case 2:
-                // Next track
-                playbackAction.setAction(ACTION_NEXT);
-                return PendingIntent.getService(this, actionNumber, playbackAction, 0);
-            case 3:
-                // Previous track
-                playbackAction.setAction(ACTION_PREVIOUS);
-                return PendingIntent.getService(this, actionNumber, playbackAction, 0);
-            default:
-                break;
-        }
-        return null;
-    }*/
-    private void handleIncomingActions(Intent playbackAction) {
-        /*this function handles the actions when user presses notification buttons
-        * each transport control function triggered executes one of the MediaSession
-        * callback methods implemented in initMediaSession()*/
-        if (playbackAction == null || playbackAction.getAction() == null) return;
-
-        String actionString = playbackAction.getAction();
-        if (actionString.equalsIgnoreCase(ACTION_PLAY)) {
-            transportControls.play();
-        } else if (actionString.equalsIgnoreCase(ACTION_PAUSE)) {
-            transportControls.pause();
-        } else if (actionString.equalsIgnoreCase(ACTION_NEXT)) {
-            transportControls.skipToNext();
-        } else if (actionString.equalsIgnoreCase(ACTION_PREVIOUS)) {
-            transportControls.skipToPrevious();
-        } else if (actionString.equalsIgnoreCase(ACTION_STOP)) {
-            transportControls.stop();
-        }
-    }
-
 
 
     //------------------------------------Less important methods----------------------------------//
