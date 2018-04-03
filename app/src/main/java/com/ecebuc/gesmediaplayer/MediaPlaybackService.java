@@ -43,19 +43,18 @@ public class MediaPlaybackService extends MediaBrowserServiceCompat implements
 
         AudioManager.OnAudioFocusChangeListener {
 
-    public static final String COMMAND_EXAMPLE = "command_example";
     public static final int NOTIFICATION_ID = 123;
     public static boolean isServiceStarted = false;
 
     private static int audioIndex = -1;
     private ArrayList<Audio> audioList;
     private Audio activeAudio = null;
+    private int pausedPosition;
 
     private MediaPlayer gesMediaPlayer;
     private MediaSessionCompat gesMediaSession;
     private MediaControllerCompat.TransportControls transportControls;
 
-    private int pausedPosition;
 
     public static final String ACTION_PLAY = "com.example.gesmediaplayer.ACTION_PLAY";
     public static final String ACTION_PAUSE = "com.example.gesmediaplayer.ACTION_PAUSE";
@@ -160,7 +159,8 @@ public class MediaPlaybackService extends MediaBrowserServiceCompat implements
     @Override
     public void onCompletion(MediaPlayer mediaPlayer) {
         if( gesMediaPlayer != null ) {
-            gesMediaPlayer.release();
+            gesMediaPlayer.reset();
+            transportControls.skipToNext();
         }
     }
     @Override
@@ -265,7 +265,17 @@ public class MediaPlaybackService extends MediaBrowserServiceCompat implements
 
         registerReceiver(notificationPlaybackCommand, notificationFilter);
     }
-
+    private void updateMetaData() {
+        Bitmap albumArt = BitmapFactory.decodeResource(getResources(),
+                R.drawable.skepty_face); //image cover in ../res/drawable/
+        // Update the current metadata
+        gesMediaSession.setMetadata(new MediaMetadataCompat.Builder()
+                .putBitmap(MediaMetadataCompat.METADATA_KEY_ALBUM_ART, albumArt)
+                .putString(MediaMetadataCompat.METADATA_KEY_ARTIST, activeAudio.getArtist())
+                .putString(MediaMetadataCompat.METADATA_KEY_ALBUM, activeAudio.getAlbum())
+                .putString(MediaMetadataCompat.METADATA_KEY_TITLE, activeAudio.getTitle())
+                .build());
+    }
 
 
     //-----------------------------------Media Playback functions---------------------------------//
@@ -375,17 +385,15 @@ public class MediaPlaybackService extends MediaBrowserServiceCompat implements
         public void onStop() {
             super.onStop();
 
-            AudioManager am = (AudioManager) getSystemService(Context.AUDIO_SERVICE);
             // Abandon audio focus
+            AudioManager am = (AudioManager) getSystemService(Context.AUDIO_SERVICE);
             am.abandonAudioFocus(MediaPlaybackService.this);
 
-            // Stop the service
             stopSelf();
             // Set the session inactive  (and update metadata and state)
             gesMediaSession.setActive(false);
-            // stop the player (custom call)
             gesMediaPlayer.stop();
-            //stopForeground(true);
+            removeNotification();
         }
         @Override
         public void onPlayFromMediaId(String mediaId, Bundle extras) {
@@ -425,13 +433,6 @@ public class MediaPlaybackService extends MediaBrowserServiceCompat implements
             //Work with extras here if you want
         }
         @Override
-        public void onCommand(String command, Bundle extras, ResultReceiver cb) {
-            super.onCommand(command, extras, cb);
-            if( COMMAND_EXAMPLE.equalsIgnoreCase(command) ) {
-                //Custom command here
-            }
-        }
-        @Override
         public void onSeekTo(long pos) {
             super.onSeekTo(pos);
         }
@@ -457,56 +458,12 @@ public class MediaPlaybackService extends MediaBrowserServiceCompat implements
 
 
 
-    //-------------------------------Audio Focus and Calls Handling-------------------------------//
+    //------------------------------AudioFocus, Calls and Broadcasts-------------------------------//
 
     //Handle incoming phone calls
     private boolean ongoingCall = false;
     private PhoneStateListener phoneStateListener;
     private TelephonyManager telephonyManager;
-
-    @Override
-    public void onAudioFocusChange(int focusChange) {
-        switch( focusChange ) {
-            case AudioManager.AUDIOFOCUS_LOSS: {
-                // Lost focus for an unbounded amount of time:
-                // stop playback and release media player
-                if( gesMediaPlayer.isPlaying() ) {
-                    gesMediaPlayer.stop();
-                }
-                /*gesMediaPlayer.release();
-                gesMediaPlayer = null;*/
-                break;
-            }
-            case AudioManager.AUDIOFOCUS_LOSS_TRANSIENT: {
-                // Lost focus for a short time; Pause only and do not
-                // release the media player as playback is likely to resume
-                if (gesMediaPlayer.isPlaying()) {
-                    gesMediaPlayer.pause();
-                    setMediaPlaybackState(PlaybackStateCompat.STATE_PAUSED);
-                }
-                break;
-            }
-            case AudioManager.AUDIOFOCUS_LOSS_TRANSIENT_CAN_DUCK: {
-                // Lost focus for a short time (ex. notification sound)
-                // but it's ok to keep playing at a temporarily attenuated level
-                if( gesMediaPlayer != null ) {
-                    gesMediaPlayer.setVolume(0.2f, 0.2f);
-                }
-                break;
-            }
-            case AudioManager.AUDIOFOCUS_GAIN: {
-                //Invoked when the audio focus of the system is updated.
-                if( gesMediaPlayer != null ) {
-                    if( !gesMediaPlayer.isPlaying() ) {
-                        gesMediaPlayer.start();
-                        setMediaPlaybackState(PlaybackStateCompat.STATE_PLAYING);
-                    }
-                    gesMediaPlayer.setVolume(1.0f, 1.0f);
-                }
-                break;
-            }
-        }
-    }
 
     private boolean requestAudioFocus() {
         AudioManager audioManager = (AudioManager) getSystemService(Context.AUDIO_SERVICE);
@@ -553,6 +510,53 @@ public class MediaPlaybackService extends MediaBrowserServiceCompat implements
         telephonyManager.listen(phoneStateListener,
                 PhoneStateListener.LISTEN_CALL_STATE);
     }
+    @Override
+    public void onAudioFocusChange(int focusChange) {
+        switch( focusChange ) {
+            case AudioManager.AUDIOFOCUS_LOSS: {
+                // Lost focus for an unbounded amount of time:
+                // stop playback and (maybe) release media player
+                if( gesMediaPlayer.isPlaying() ) {
+                    gesMediaPlayer.pause();
+                    setMediaPlaybackState(PlaybackStateCompat.STATE_PAUSED);
+                    createNotification();
+                    //gesMediaPlayer.stop();
+                    //transportControls.stop();
+                }
+                break;
+            }
+            case AudioManager.AUDIOFOCUS_LOSS_TRANSIENT: {
+                // Lost focus for a short time; Pause only and do not
+                // release the media player as playback is likely to resume
+                if (gesMediaPlayer.isPlaying()) {
+                    gesMediaPlayer.pause();
+                    setMediaPlaybackState(PlaybackStateCompat.STATE_PAUSED);
+                    createNotification();
+                }
+                break;
+            }
+            case AudioManager.AUDIOFOCUS_LOSS_TRANSIENT_CAN_DUCK: {
+                // Lost focus for a short time (ex. notification sound)
+                // but it's ok to keep playing at a temporarily attenuated level
+                if( gesMediaPlayer != null ) {
+                    gesMediaPlayer.setVolume(0.2f, 0.2f);
+                }
+                break;
+            }
+            case AudioManager.AUDIOFOCUS_GAIN: {
+                //Invoked when the audio focus of the system is updated.
+                if( gesMediaPlayer != null ) {
+                    if( !gesMediaPlayer.isPlaying() ) {
+                        gesMediaPlayer.start();
+                        setMediaPlaybackState(PlaybackStateCompat.STATE_PLAYING);
+                        createNotification();
+                    }
+                    gesMediaPlayer.setVolume(1.0f, 1.0f);
+                }
+                break;
+            }
+        }
+    }
 
     private BroadcastReceiver becomingNoisyReceiver = new BroadcastReceiver() {
         @Override
@@ -575,8 +579,6 @@ public class MediaPlaybackService extends MediaBrowserServiceCompat implements
                 //TODO: will have to handle scenario of no songs on device (app mustn't crash)
                 return;
             }
-            //audioIndex = storageUtils.loadAudioIndex();
-            //activeAudio = audioList.get(audioIndex);
             Log.d("audioLoadReceiver: ", "exited onReceive");
         }
     };
@@ -600,6 +602,9 @@ public class MediaPlaybackService extends MediaBrowserServiceCompat implements
             } else if (actionString.equalsIgnoreCase(ACTION_STOP)) {
                 transportControls.stop();
             }
+
+            Log.d("notifPlayCommand: ", "exited onReceive");
+
         }
     };
 
@@ -663,7 +668,7 @@ public class MediaPlaybackService extends MediaBrowserServiceCompat implements
                 // Stop the service when the notification is swiped away //TODO: not working, see cancelButton
                 .setDeleteIntent(stopPendingIntent)
 
-                // Make the transport controls visible on the lockscreen
+                // Make the transport controls visible on the lockscreen //TODO: also not showing
                 .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
 
                 // Set the Notification style
@@ -688,6 +693,7 @@ public class MediaPlaybackService extends MediaBrowserServiceCompat implements
                 .setContentTitle(activeAudio.getTitle())
                 .setShowWhen(false) //don't display timestamp
 
+                // Set notification action buttons for music playback
                 .addAction(android.R.drawable.ic_media_previous, "Previous",
                         previousSongPendingIntent)
                 .addAction(playPauseNotificationIcon, "PlayPause", playPauseSongPendingIntent)
@@ -698,7 +704,10 @@ public class MediaPlaybackService extends MediaBrowserServiceCompat implements
         ((NotificationManager) getSystemService(Context.NOTIFICATION_SERVICE))
                 .notify(NOTIFICATION_ID, notificationBuilder.build());
     }
-
+    private void removeNotification() {
+        NotificationManager notificationManager = (NotificationManager) getSystemService(Context.NOTIFICATION_SERVICE);
+        notificationManager.cancel(NOTIFICATION_ID);
+    }
 
     //------------------------------------Less important methods----------------------------------//
 
