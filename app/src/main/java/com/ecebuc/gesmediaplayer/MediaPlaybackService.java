@@ -114,16 +114,17 @@ public class MediaPlaybackService extends MediaBrowserServiceCompat implements
         }
 
         /*//clear cached playlist
-        //new StorageUtils(getApplicationContext()).clearCachedAudioPlaylist();
-        stopSelf();*/
+        //new StorageUtils(getApplicationContext()).clearCachedAudioPlaylist();*/
 
-        //Audio focus shouldn't need to be abbandoned here, already done in onStop()
-        /*AudioManager audioManager = (AudioManager) getSystemService(Context.AUDIO_SERVICE);
-        audioManager.abandonAudioFocus(this);*/
         gesMediaSession.release();
-        //NotificationManagerCompat.from(this).cancel(1);
         unregisterReceiver(audioLoadComplete);
-        unregisterReceiver(notificationPlaybackCommand);
+
+        /*handle app crash when it is started but no music is played, as
+        * the broadcast receiver is never being registered, giving error
+        * when entering onDestroy with an unregistered receiver*/
+        if(isServiceStarted){
+            unregisterReceiver(notificationPlaybackCommand);
+        }
         Log.d("service onDestroy: ", "everything unregistered and cleared in service, exiting...");
     }
 
