@@ -19,12 +19,13 @@ import android.os.Bundle;
 import android.util.Log;
 import android.view.View;
 import android.widget.Button;
+import android.support.v7.widget.Toolbar;
 
 import java.util.ArrayList;
 
 public class MainActivity extends AppCompatActivity implements View.OnClickListener {
 
-    Button playPauseToggleButton;
+    Button playPauseToggleButton, loadNavActivityButton;
 
     private final int REQUEST_CODE_GESPLAYER_EXTERNAL_STORAGE = 101;
     public static final String BROADCAST_AUDIO_LOAD_COMPLETE = "com.ecebuc.gesmediaplayer.AudioLoadComplete";
@@ -131,6 +132,7 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
 
         //grab the buttons for media playback control
         playPauseToggleButton = (Button) findViewById(R.id.playPause_btn);
+        loadNavActivityButton = (Button) findViewById(R.id.loadNavActivity_btn);
 
         //initialize the songs list
         audioFilesOnDevice = new ArrayList<Audio>();
@@ -153,6 +155,7 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
         }
 
         playPauseToggleButton.setOnClickListener(this);
+        loadNavActivityButton.setOnClickListener(this);
         Log.d("onCreate: ", "exited onCreate");
     }
     @Override
@@ -213,6 +216,11 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
                     }
                     currentPlaybackState = STATE_PAUSED;
                 }
+                break;
+
+            case R.id.loadNavActivity_btn:
+                Intent loadIntent = new Intent(this, HomeActivity.class);
+                startActivity(loadIntent);
                 break;
 
             //space for future cases here
