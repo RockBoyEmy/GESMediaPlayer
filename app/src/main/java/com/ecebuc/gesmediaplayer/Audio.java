@@ -8,12 +8,14 @@ public class Audio implements Serializable {
     private String title;
     private String album;
     private String artist;
+    private String albumArt;
 
-    public Audio(String data, String title, String album, String artist) {
+    public Audio(String data, String title, String album, String artist, String albumArt) {
         this.data = data;
         this.title = title;
         this.album = album;
         this.artist = artist;
+        this.albumArt = albumArt;
     }
 
     public String getData() {
@@ -47,4 +49,8 @@ public class Audio implements Serializable {
     public void setArtist(String artist) {
         this.artist = artist;
     }
+
+    public String getAlbumArt() { return albumArt; }
+
+    public void setAlbumArt(String albumArt) { this.albumArt = albumArt; }
 }

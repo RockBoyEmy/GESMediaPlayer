@@ -8,6 +8,7 @@ import android.database.Cursor;
 import android.net.Uri;
 import android.os.RemoteException;
 import android.provider.MediaStore;
+import android.support.design.widget.Snackbar;
 import android.support.v4.app.ActivityCompat;
 import android.support.v4.content.ContextCompat;
 import android.support.v4.media.MediaBrowserCompat;
@@ -20,6 +21,7 @@ import android.util.Log;
 import android.view.View;
 import android.widget.Button;
 import android.support.v7.widget.Toolbar;
+import android.widget.Toast;
 
 import java.util.ArrayList;
 
@@ -200,6 +202,21 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
         gesMediaBrowser = null;
         Log.d("onDestroy: ", "exited onDestroy");
     }
+    @Override
+    public void onBackPressed(){
+        /*if(MediaPlaybackService.isServiceStarted){
+            Toast.makeText(this, "onBackPressed: true", Toast.LENGTH_SHORT).show();
+            Log.d("onBackPressed: ", "true");
+            //super.onBackPressed();
+            super.onBackPressed();
+        }
+        else{
+            Toast.makeText(this, "onBackPressed: false", Toast.LENGTH_SHORT).show();
+            Log.d("onBackPressed: ", "false");
+            super.onBackPressed();
+            //onDestroy();
+        }*/
+    }
 
 
     @Override
@@ -236,22 +253,39 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
     private void loadAudio() {
         Log.d("loadAudio: ", "entered loadAudio");
         ContentResolver contentResolver = getContentResolver();
+        String data, title, album, artist, albumArt;
 
         Uri uri = MediaStore.Audio.Media.EXTERNAL_CONTENT_URI;
         String selection = MediaStore.Audio.Media.IS_MUSIC + "!= 0";
         String sortOrder = MediaStore.Audio.Media.TITLE + " ASC";
         Cursor cursor = contentResolver.query(uri, null, selection, null, sortOrder);
 
+
+
+        //TODO: see this whole thing better with the album art
+
+
+
         if (cursor != null && cursor.getCount() > 0) {
             //audioFilesOnDevice = new ArrayList<>();
             while (cursor.moveToNext()) {
-                String data = cursor.getString(cursor.getColumnIndex(MediaStore.Audio.Media.DATA));
-                String title = cursor.getString(cursor.getColumnIndex(MediaStore.Audio.Media.TITLE));
-                String album = cursor.getString(cursor.getColumnIndex(MediaStore.Audio.Media.ALBUM));
-                String artist = cursor.getString(cursor.getColumnIndex(MediaStore.Audio.Media.ARTIST));
+                String albumId = cursor.getString(cursor.getColumnIndex(MediaStore.Audio.Media.ALBUM_ID));
+                 data = cursor.getString(cursor.getColumnIndex(MediaStore.Audio.Media.DATA));
+                 title = cursor.getString(cursor.getColumnIndex(MediaStore.Audio.Media.TITLE));
+                 album = cursor.getString(cursor.getColumnIndex(MediaStore.Audio.Media.ALBUM));
+                 artist = cursor.getString(cursor.getColumnIndex(MediaStore.Audio.Media.ARTIST));
+                // albumArt = cursor.getString(cursor.getColumnIndex(MediaStore.Audio.Albums.ALBUM_ART));
+
+                Cursor albumArtCursor = getContentResolver().query(MediaStore.Audio.Albums.EXTERNAL_CONTENT_URI,
+                        new String[] {MediaStore.Audio.Albums._ID, MediaStore.Audio.Albums.ALBUM_ART},
+                        MediaStore.Audio.Albums._ID+ "=?",
+                        new String[] {String.valueOf(albumId)},
+                        null);
+                albumArtCursor.moveToFirst();
+                albumArt = albumArtCursor.getString(albumArtCursor.getColumnIndex(MediaStore.Audio.Albums.ALBUM_ART));
 
                 // Save to audioList
-                audioFilesOnDevice.add(new Audio(data, title, album, artist));
+                audioFilesOnDevice.add(new Audio(data, title, album, artist, albumArt));
             }
         }
         cursor.close();

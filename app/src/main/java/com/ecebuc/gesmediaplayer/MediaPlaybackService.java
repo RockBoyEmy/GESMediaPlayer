@@ -633,26 +633,31 @@ public class MediaPlaybackService extends MediaBrowserServiceCompat implements
         Log.d("createNotification: ", "playbackState is " + state.getState());
 
         //notification needs to be initialized - so it will initially be the pause icon
-        int playPauseNotificationIcon = android.R.drawable.ic_media_pause;
+        int playPauseNotificationIcon = R.drawable.ic_pause_black_24dp;/*android.R.drawable.ic_media_pause;*/
 
         //Build a new notification according to the current state of the MediaPlayer
         if(state.getState() == PlaybackStateCompat.STATE_PAUSED){
             Log.d("createNotification: ", "should be Paused");
-            playPauseNotificationIcon = android.R.drawable.ic_media_play;
+            playPauseNotificationIcon = R.drawable.ic_play_arrow_black_24dp;/*android.R.drawable.ic_media_play;*/
             playPauseSongIntent.setAction(ACTION_PLAY);
             playPauseSongPendingIntent = PendingIntent.getBroadcast(this, 0,
                                                                     playPauseSongIntent, 0);
 
         } if(state.getState() == PlaybackStateCompat.STATE_PLAYING){
             Log.d("createNotification: ", "should be Playing");
-            playPauseNotificationIcon = android.R.drawable.ic_media_pause;
+            playPauseNotificationIcon = R.drawable.ic_pause_black_24dp;/*android.R.drawable.ic_media_pause*/
             playPauseSongIntent.setAction(ACTION_PAUSE);
             playPauseSongPendingIntent = PendingIntent.getBroadcast(this, 0,
                                                                     playPauseSongIntent, 0);
         }
 
+        //set a default icon for song cover
         Bitmap largeIcon = BitmapFactory.decodeResource(getResources(),
                 R.drawable.skepty_face); //replace with your own default image/cover
+        if(activeAudio.getAlbumArt() != null){
+            largeIcon = BitmapFactory.decodeFile(activeAudio.getAlbumArt());
+        }
+
 
         //TODO this doesn't work for now - starting the activity when clicking the notification
         Intent notificationClickIntent = new Intent(this, MainActivity.class);
@@ -685,7 +690,8 @@ public class MediaPlaybackService extends MediaBrowserServiceCompat implements
                 .setColor(getResources().getColor(R.color.colorPrimaryDark))
 
                 // Set the large and small icons
-                .setSmallIcon(android.R.drawable.stat_sys_headset)
+                //.setSmallIcon(android.R.drawable.stat_sys_headset)
+                .setSmallIcon(R.drawable.ic_headset_black_24dp)
                 .setLargeIcon(largeIcon)
 
                 // Set Notification content information
@@ -695,10 +701,12 @@ public class MediaPlaybackService extends MediaBrowserServiceCompat implements
                 .setShowWhen(false) //don't display timestamp
 
                 // Set notification action buttons for music playback
-                .addAction(android.R.drawable.ic_media_previous, "Previous",
+                .addAction(R.drawable.ic_skip_previous_black_24dp/*android.R.drawable.ic_media_previous*/,
+                        "Previous",
                         previousSongPendingIntent)
                 .addAction(playPauseNotificationIcon, "PlayPause", playPauseSongPendingIntent)
-                .addAction(android.R.drawable.ic_media_next, "Next",
+                .addAction(R.drawable.ic_skip_next_black_24dp/*android.R.drawable.ic_media_next*/,
+                        "Next",
                         nextSongPendingIntent);
 
         //.build();
