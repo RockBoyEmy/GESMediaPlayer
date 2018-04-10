@@ -15,7 +15,6 @@ import android.media.MediaPlayer;
 import android.os.Build;
 import android.os.Bundle;
 import android.os.PowerManager;
-import android.os.ResultReceiver;
 import android.support.annotation.NonNull;
 import android.support.annotation.Nullable;
 import android.support.v4.media.session.MediaControllerCompat;
@@ -31,6 +30,8 @@ import android.telephony.PhoneStateListener;
 import android.telephony.TelephonyManager;
 import android.text.TextUtils;
 import android.util.Log;
+
+import com.ecebuc.gesmediaplayer.Audios.Audio;
 
 import java.io.IOException;
 import java.util.ArrayList;
@@ -665,19 +666,20 @@ public class MediaPlaybackService extends MediaBrowserServiceCompat implements
         //TODO this doesn't work for now - starting the activity when clicking the notification
         Intent notificationClickIntent = new Intent(this, MainActivity.class);
         notificationClickIntent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TASK);
-        PendingIntent clickActivityStart = PendingIntent.getActivity(this, 0, notificationClickIntent ,0);
+        PendingIntent clickActivityStart = PendingIntent.getActivity(this, 0,
+                                            notificationClickIntent , PendingIntent.FLAG_UPDATE_CURRENT);
 
         NotificationCompat.Builder notificationBuilder = (NotificationCompat.Builder)
                 new NotificationCompat.Builder(this, CHANNEL_ID);
         notificationBuilder
-                // Enable launching the player by clicking the notification //TODO this doesn't work for now
-                .setContentIntent(gesMediaSession.getController().getSessionActivity())
-                //.setContentIntent(clickActivityStart)
+                // Enable launching the player by clicking the notification
+                //.setContentIntent(gesMediaSession.getController().getSessionActivity())
+                .setContentIntent(clickActivityStart) //TODO doesn't work well for now, restarts, leaking receivers
 
                 // Stop the service when the notification is swiped away //TODO: not working, see cancelButton
                 .setDeleteIntent(stopPendingIntent)
 
-                // Make the transport controls visible on the lockscreen //TODO: also not showing
+                // Make the transport controls visible on the lockscreen
                 .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
 
                 // Set the Notification style

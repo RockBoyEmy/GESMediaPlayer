@@ -1,4 +1,4 @@
-package com.ecebuc.gesmediaplayer;
+package com.ecebuc.gesmediaplayer.Audios;
 
 import java.io.Serializable;
 
