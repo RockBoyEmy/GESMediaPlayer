@@ -9,7 +9,6 @@
     <string name="nav_header_title">GES Media Player</string>
     <string name="nav_header_subtitle">1502068@uad.ac.uk</string>
     <string name="nav_header_desc">Navigation header</string>
-    <!--<string name="nav_header_title">Android Studio</string>-->
 
     <!--Navigation bar option strings-->
     <string name="navigation_drawer_playing_now">Playing Now</string>

@@ -7,6 +7,8 @@ import android.support.v4.view.GravityCompat;
 import android.support.v4.widget.DrawerLayout;
 import android.support.v7.app.ActionBarDrawerToggle;
 import android.support.v7.app.AppCompatActivity;
+import android.support.v7.widget.LinearLayoutManager;
+import android.support.v7.widget.RecyclerView;
 import android.support.v7.widget.SearchView;
 import android.support.v7.widget.Toolbar;
 import android.view.Gravity;
@@ -15,13 +17,36 @@ import android.view.MenuItem;
 import android.view.View;
 import android.widget.Button;
 
+import java.util.ArrayList;
+
 public class HomeActivity extends AppCompatActivity
         implements NavigationView.OnNavigationItemSelectedListener {
+
+    private RecyclerView songRecyclerView;
+    private RecyclerView.Adapter songRecyclerAdapter;
+    private RecyclerView.LayoutManager recyclerLayoutManager;
+
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_home);
+
+        //get the songs list for the recyclerview adapter
+        ArrayList<Audio> songList;
+        StorageUtils storageUtils = new StorageUtils(getApplicationContext());
+        songList = storageUtils.loadAudio();
+
+        //Recycler view setup for songs display
+        songRecyclerView = (RecyclerView) findViewById(R.id.recycler_view);
+        songRecyclerView.setHasFixedSize(true);
+
+        recyclerLayoutManager = new LinearLayoutManager(this);
+        songRecyclerView.setLayoutManager(recyclerLayoutManager);
+
+        songRecyclerAdapter = new SongAdapter(songList);
+        songRecyclerView.setAdapter(songRecyclerAdapter);
+
 
         //Custom toolbar setup
         Toolbar activity_home_toolbar = (Toolbar) findViewById(R.id.toolbar_home);
@@ -30,33 +55,15 @@ public class HomeActivity extends AppCompatActivity
         //Navigation drawer and animation setup for the activity
         DrawerLayout nav_drawer = (DrawerLayout) findViewById(R.id.nav_drawer_layout);
         ActionBarDrawerToggle navToggleActionButton = new ActionBarDrawerToggle(this,
-                                                                        nav_drawer,
-                                                                        activity_home_toolbar,
-                                                                R.string.navigation_drawer_open,
-                                                                R.string.navigation_drawer_close);
+                nav_drawer,
+                activity_home_toolbar,
+                R.string.navigation_drawer_open,
+                R.string.navigation_drawer_close);
         nav_drawer.addDrawerListener(navToggleActionButton);
         navToggleActionButton.syncState();
 
         NavigationView navigationView = (NavigationView) findViewById(R.id.nav_drawer_view);
         navigationView.setNavigationItemSelectedListener(this);
-
-        Button bubububu = (Button) findViewById(R.id.button2);
-        bubububu.setOnClickListener(new View.OnClickListener() {
-            @Override
-            public void onClick(View view) {
-                Snackbar.make(view, "Test test", Snackbar.LENGTH_SHORT)
-                        .show();
-            }
-        });
-
-        /*FloatingActionButton fab = (FloatingActionButton) findViewById(R.id.fab);
-        fab.setOnClickListener(new View.OnClickListener() {
-            @Override
-            public void onClick(View view) {
-                Snackbar.make(view, "Replace with your own action", Snackbar.LENGTH_LONG)
-                        .setAction("Action", null).show();
-            }
-        });*/
     }
 
     @Override
@@ -78,7 +85,7 @@ public class HomeActivity extends AppCompatActivity
         SearchView searchView = (SearchView) searchItem.getActionView(); //the textView of the search
 
         /* Can now use the view to extract the content (search words) from
-        * it and perform the searching operation*/
+         * it and perform the searching operation*/
 
         // Configure the search info and add any event listeners...
 
@@ -106,7 +113,7 @@ public class HomeActivity extends AppCompatActivity
         // Handle navigation view item clicks here.
         int id = item.getItemId();
 
-        switch(id){
+        switch (id) {
             case R.id.nav_playing_now:
                 break;
             case R.id.nav_all_songs:
@@ -125,4 +132,7 @@ public class HomeActivity extends AppCompatActivity
         nav_drawer.closeDrawer(GravityCompat.START);
         return true;
     }
+
+
+
 }
