@@ -145,6 +145,7 @@ public class MediaPlaybackService extends MediaBrowserServiceCompat implements
             gesMediaPlayer.prepareAsync();
         } catch (IOException e) {
             e.printStackTrace();
+            Log.e("MUSIC SERVICE", "Error setting data source", e);
             stopSelf();
         }
 
@@ -160,8 +161,10 @@ public class MediaPlaybackService extends MediaBrowserServiceCompat implements
     @Override
     public void onCompletion(MediaPlayer mediaPlayer) {
         if( gesMediaPlayer != null ) {
-            gesMediaPlayer.reset();
+            //gesMediaPlayer.reset();
             transportControls.skipToNext();
+            //should not reset in here because it breaks controls of the
+            //notification as the song changes, should only skip to next
         }
     }
     @Override
