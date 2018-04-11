@@ -32,7 +32,6 @@ public class Album implements Serializable {
     }
 
     public String getAlbumId() {
-
         return albumId;
     }
 
@@ -47,6 +46,5 @@ public class Album implements Serializable {
     public String getAlbumArt() {
         return albumArt;
     }
-
 
 }

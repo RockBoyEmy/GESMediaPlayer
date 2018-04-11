@@ -1,4 +1,4 @@
-package com.ecebuc.gesmediaplayer;
+package com.ecebuc.gesmediaplayer.AudioUtils;
 
 import android.content.Context;
 import android.content.SharedPreferences;

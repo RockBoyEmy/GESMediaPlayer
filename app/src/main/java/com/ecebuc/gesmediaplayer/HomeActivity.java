@@ -1,51 +1,56 @@
 package com.ecebuc.gesmediaplayer;
 
+import android.net.Uri;
 import android.os.Bundle;
 import android.support.design.widget.NavigationView;
-import android.support.design.widget.Snackbar;
+import android.support.v4.app.FragmentTransaction;
 import android.support.v4.view.GravityCompat;
 import android.support.v4.widget.DrawerLayout;
 import android.support.v7.app.ActionBarDrawerToggle;
 import android.support.v7.app.AppCompatActivity;
-import android.support.v7.widget.LinearLayoutManager;
-import android.support.v7.widget.RecyclerView;
 import android.support.v7.widget.SearchView;
 import android.support.v7.widget.Toolbar;
-import android.view.Gravity;
 import android.view.Menu;
 import android.view.MenuItem;
-import android.view.View;
-import android.widget.Button;
 
-import java.util.ArrayList;
+import com.ecebuc.gesmediaplayer.Fragments.AlbumsFragment;
+import com.ecebuc.gesmediaplayer.Fragments.ArtistsFragment;
+import com.ecebuc.gesmediaplayer.Fragments.SongsFragment;
 
 public class HomeActivity extends AppCompatActivity
-        implements NavigationView.OnNavigationItemSelectedListener {
-
-    private RecyclerView songRecyclerView;
-    private RecyclerView.Adapter songRecyclerAdapter;
-    private RecyclerView.LayoutManager recyclerLayoutManager;
-
+        implements NavigationView.OnNavigationItemSelectedListener,
+                    SongsFragment.OnFragmentInteractionListener,
+                    AlbumsFragment.OnFragmentInteractionListener,
+                    ArtistsFragment.OnFragmentInteractionListener {
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_home);
 
-        //get the songs list for the recyclerview adapter
-        ArrayList<Audio> songList;
-        StorageUtils storageUtils = new StorageUtils(getApplicationContext());
-        songList = storageUtils.loadAudio();
+        //setting up the fragments stuff
+        // Check that the activity is using the layout version with
+        // the fragment_container FrameLayout
+        if (findViewById(R.id.home_fragment_container) != null) {
 
-        //Recycler view setup for songs display
-        songRecyclerView = (RecyclerView) findViewById(R.id.recycler_view);
-        songRecyclerView.setHasFixedSize(true);
+            // However, if we're being restored from a previous state,
+            // then we don't need to do anything and should return or else
+            // we could end up with overlapping fragments.
+            if (savedInstanceState != null) {
+                return;
+            }
 
-        recyclerLayoutManager = new LinearLayoutManager(this);
-        songRecyclerView.setLayoutManager(recyclerLayoutManager);
+            // Create a new Fragment to be placed in the activity layout
+            SongsFragment firstFragment = new SongsFragment();
 
-        songRecyclerAdapter = new SongAdapter(songList);
-        songRecyclerView.setAdapter(songRecyclerAdapter);
+            // In case this activity was started with special instructions from an
+            // Intent, pass the Intent's extras to the fragment as arguments
+            //firstFragment.setArguments(getIntent().getExtras());
+
+            // Add the fragment to the 'fragment_container' FrameLayout
+            getSupportFragmentManager().beginTransaction()
+                    .add(R.id.home_fragment_container, firstFragment).commit();
+        }
 
 
         //Custom toolbar setup
@@ -111,17 +116,41 @@ public class HomeActivity extends AppCompatActivity
     @Override
     public boolean onNavigationItemSelected(MenuItem item) {
         // Handle navigation view item clicks here.
+        FragmentTransaction fragmentTransaction;
         int id = item.getItemId();
 
         switch (id) {
             case R.id.nav_playing_now:
                 break;
             case R.id.nav_all_songs:
+                // Create the songs fragment
+                SongsFragment songsFragment = new SongsFragment();
+                fragmentTransaction = getSupportFragmentManager().beginTransaction();
+
+                // Replace whatever is in the fragment_container view with this fragment,
+                // and add the transaction to the back stack so the user can navigate back
+                fragmentTransaction.replace(R.id.home_fragment_container, songsFragment);
+                fragmentTransaction.addToBackStack(null);
+
+                // Commit the transaction
+                fragmentTransaction.commit();
                 break;
+
             case R.id.nav_artists:
+                ArtistsFragment artistsFragment = new ArtistsFragment();
+                fragmentTransaction = getSupportFragmentManager().beginTransaction();
+                fragmentTransaction.replace(R.id.home_fragment_container, artistsFragment);
+                fragmentTransaction.addToBackStack(null);
+                fragmentTransaction.commit();
                 break;
             case R.id.nav_albums:
+                AlbumsFragment albumsFragment = new AlbumsFragment();
+                fragmentTransaction = getSupportFragmentManager().beginTransaction();
+                fragmentTransaction.replace(R.id.home_fragment_container, albumsFragment);
+                fragmentTransaction.addToBackStack(null);
+                fragmentTransaction.commit();
                 break;
+
             case R.id.nav_settings:
                 break;
             case R.id.nav_share:
@@ -133,6 +162,10 @@ public class HomeActivity extends AppCompatActivity
         return true;
     }
 
+    @Override
+    public void onFragmentInteraction(Uri uri){
+
+    }
 
 
 }

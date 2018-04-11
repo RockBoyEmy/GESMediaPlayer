@@ -1,4 +1,4 @@
-package com.ecebuc.gesmediaplayer.fragments;
+package com.ecebuc.gesmediaplayer.Fragments;
 
 import android.content.Context;
 import android.net.Uri;
@@ -14,8 +14,8 @@ import android.view.ViewGroup;
 
 import com.ecebuc.gesmediaplayer.Audios.Audio;
 import com.ecebuc.gesmediaplayer.R;
-import com.ecebuc.gesmediaplayer.SongAdapter;
-import com.ecebuc.gesmediaplayer.StorageUtils;
+import com.ecebuc.gesmediaplayer.AudioUtils.SongAdapter;
+import com.ecebuc.gesmediaplayer.AudioUtils.StorageUtils;
 
 import java.util.ArrayList;
 
@@ -27,7 +27,6 @@ public class SongsFragment extends Fragment {
     private RecyclerView.Adapter songRecyclerAdapter;
     private RecyclerView.LayoutManager recyclerLayoutManager;
     private Context context;
-
 
     public SongsFragment() {
         // Required empty public constructor
@@ -41,6 +40,32 @@ public class SongsFragment extends Fragment {
         return fragment;
     }
 
+    @Override
+    public void onAttach(Context context) {
+        super.onAttach(context);
+        if (context instanceof OnFragmentInteractionListener) {
+            mListener = (OnFragmentInteractionListener) context;
+        } else {
+            throw new RuntimeException(context.toString()
+                    + " must implement OnFragmentInteractionListener");
+        }
+    }
+    @Override
+    public void onCreate(Bundle savedInstanceState) {
+        super.onCreate(savedInstanceState);
+        /*if (getArguments() != null) {
+            mParam1 = getArguments().getString(ARG_PARAM1);
+            mParam2 = getArguments().getString(ARG_PARAM2);
+        }*/
+        if(getActivity() != null){
+            context = getActivity();
+        }
+        else
+        {
+            Log.e("SongFrag onCreate: ", "getActivity was null");
+            Log.d("SongFrag onCreate: ", "getActivity was null");
+        }
+    }
     @Override
     public View onCreateView(LayoutInflater inflater, ViewGroup container, Bundle savedInstanceState) {
         // Inflate the layout for this fragment
@@ -65,43 +90,15 @@ public class SongsFragment extends Fragment {
         return rootView;
     }
     @Override
-    public void onCreate(Bundle savedInstanceState) {
-        super.onCreate(savedInstanceState);
-        /*if (getArguments() != null) {
-            mParam1 = getArguments().getString(ARG_PARAM1);
-            mParam2 = getArguments().getString(ARG_PARAM2);
-        }*/
-        if(getActivity() != null){
-            context = getActivity();
-        }
-        else
-        {
-            Log.e("SongFrag onCreate: ", "getActivity was null");
-            Log.d("SongFrag onCreate: ", "getActivity was null");
-        }
+    public void onDetach() {
+        super.onDetach();
+        mListener = null;
     }
-
 
     public void onButtonPressed(Uri uri) {
         if (mListener != null) {
             mListener.onFragmentInteraction(uri);
         }
-    }
-
-    @Override
-    public void onAttach(Context context) {
-        super.onAttach(context);
-        if (context instanceof OnFragmentInteractionListener) {
-            mListener = (OnFragmentInteractionListener) context;
-        } else {
-            throw new RuntimeException(context.toString()
-                    + " must implement OnFragmentInteractionListener");
-        }
-    }
-    @Override
-    public void onDetach() {
-        super.onDetach();
-        mListener = null;
     }
 
     /**

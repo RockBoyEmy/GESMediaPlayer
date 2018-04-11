@@ -1,0 +1,63 @@
+<?xml version="1.0" encoding="utf-8"?>
+<android.support.constraint.ConstraintLayout
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:id="@+id/recycler_artist_item"
+    android:layout_width="match_parent"
+    android:layout_height="@dimen/recycler_list_artist_item"
+    android:scrollbars="vertical">
+
+    <TextView
+        android:id="@+id/artist_item_artistName"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginStart="16dp"
+        android:layout_marginTop="10dp"
+        android:text="artist name"
+        android:textColor="@color/textPrimaryOnDark"
+        android:textSize="@dimen/text_title"
+        android:textStyle="normal"
+        android:ellipsize="end"
+        android:singleLine="true"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toTopOf="parent" />
+
+    <TextView
+        android:id="@+id/artist_item_albumsNumber"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="albums number"
+        android:textColor="@color/textSecondaryOnDark"
+        android:textSize="@dimen/text_subtitle"
+        android:textStyle="normal"
+        app:layout_constraintStart_toStartOf="@+id/artist_item_artistName"
+        app:layout_constraintTop_toBottomOf="@+id/artist_item_artistName" />
+
+    <TextView
+        android:id="@+id/artist_item_albumTrackSeparator"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginStart="4dp"
+        android:text="|"
+        android:textSize="@dimen/text_subtitle"
+        android:textStyle="bold"
+        app:layout_constraintBaseline_toBaselineOf="@+id/artist_item_albumsNumber"
+        app:layout_constraintStart_toEndOf="@+id/artist_item_albumsNumber" />
+
+    <TextView
+        android:id="@+id/artist_item_tracksNumber"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginStart="4dp"
+        android:text="tracks number"
+        android:textColor="@color/textSecondaryOnDark"
+        android:textSize="@dimen/text_subtitle"
+        android:textStyle="italic"
+        app:layout_constraintBaseline_toBaselineOf="@+id/artist_item_albumTrackSeparator"
+        app:layout_constraintStart_toEndOf="@+id/artist_item_albumTrackSeparator" />
+
+
+
+
+</android.support.constraint.ConstraintLayout>

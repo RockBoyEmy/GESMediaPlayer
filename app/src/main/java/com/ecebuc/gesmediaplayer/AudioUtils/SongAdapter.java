@@ -1,4 +1,4 @@
-package com.ecebuc.gesmediaplayer;
+package com.ecebuc.gesmediaplayer.AudioUtils;
 
 import android.support.v7.widget.RecyclerView;
 import android.view.LayoutInflater;
@@ -7,6 +7,7 @@ import android.view.ViewGroup;
 import android.widget.TextView;
 
 import com.ecebuc.gesmediaplayer.Audios.Audio;
+import com.ecebuc.gesmediaplayer.R;
 
 import java.util.ArrayList;
 
@@ -20,12 +21,12 @@ public class SongAdapter extends RecyclerView.Adapter<SongAdapter.ViewHolder> {
     //you provide access to all the views for a data item in a view holder
     public static class ViewHolder extends RecyclerView.ViewHolder {
 
-        public TextView recyclerTitleView, recyclerArtistView;
+        public TextView songRecyclerTitleView, songRecyclerArtistView;
 
         public ViewHolder(View itemView) {
             super(itemView);
-            this.recyclerTitleView = (TextView) itemView.findViewById(R.id.recycler_item_songName);
-            this.recyclerArtistView = (TextView) itemView.findViewById(R.id.recycler_item_artistName);
+            this.songRecyclerTitleView = (TextView) itemView.findViewById(R.id.song_item_songName);
+            this.songRecyclerArtistView = (TextView) itemView.findViewById(R.id.song_item_artistName);
         }
     }
 
@@ -50,8 +51,8 @@ public class SongAdapter extends RecyclerView.Adapter<SongAdapter.ViewHolder> {
         // - get element from your dataset at this position
         // - replace the contents of the view with that element
         Audio currentSong = songList.get(position);
-        holder.recyclerTitleView.setText(currentSong.getTitle());
-        holder.recyclerArtistView.setText(currentSong.getArtist());
+        holder.songRecyclerTitleView.setText(currentSong.getTitle());
+        holder.songRecyclerArtistView.setText(currentSong.getArtist());
     }
 
     // Return the size of your dataset (invoked by the layout manager)

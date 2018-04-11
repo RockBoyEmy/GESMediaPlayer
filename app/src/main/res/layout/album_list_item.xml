@@ -1,0 +1,96 @@
+<?xml version="1.0" encoding="utf-8"?>
+<android.support.constraint.ConstraintLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:id="@+id/recycler_album_item"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:paddingTop="10dp"
+    android:paddingBottom="10dp"
+    android:paddingLeft="4dp"
+    android:paddingRight="4dp"
+    android:clickable="true"
+    android:focusable="true"
+    android:scrollbars="vertical">
+
+    <ImageView
+        android:id="@+id/album_item_albumCover"
+        android:layout_width="match_parent"
+        android:layout_height="150dp"
+        android:layout_alignParentTop="true"
+        android:layout_centerHorizontal="true"
+        android:background="@drawable/ic_launcher_background"
+        android:foreground="?android:attr/selectableItemBackground"
+        android:scaleType="centerCrop"
+        android:src="@drawable/ic_album_black_24dp"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toTopOf="parent" />
+        <!--The background can be changed to a solid color (could use the grey)-->
+
+    <android.support.constraint.ConstraintLayout
+        android:id="@+id/album_item_header"
+        android:layout_width="match_parent"
+        android:layout_height="@dimen/recycler_list_album_header"
+        android:paddingTop="8dp"
+        android:paddingBottom="8dp"
+        android:paddingLeft="16dp"
+        android:paddingRight="8dp"
+        android:background="@color/GESOverlayBackground"
+        android:orientation="vertical"
+        app:layout_constraintEnd_toEndOf="@+id/album_item_albumCover"
+        app:layout_constraintHorizontal_bias="0.0"
+        app:layout_constraintStart_toStartOf="@+id/album_item_albumCover"
+        app:layout_constraintTop_toBottomOf="@+id/album_item_albumCover">
+
+        <TextView
+            android:id="@+id/album_item_albumName"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:text="Album name"
+            android:textColor="@color/textPrimaryOnDark"
+            android:textSize="@dimen/text_title"
+            android:ellipsize="end"
+            android:singleLine="true"
+            app:layout_constraintEnd_toStartOf="@+id/album_item_options"
+            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintTop_toTopOf="parent" />
+
+        <TextView
+            android:id="@+id/album_item_artistName"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:text="Artist Name"
+            android:textColor="@color/textSecondaryOnDark"
+            android:textSize="@dimen/text_subtitle"
+            android:ellipsize="end"
+            android:singleLine="true"
+            app:layout_constraintEnd_toStartOf="@+id/album_item_options"
+            app:layout_constraintStart_toStartOf="@+id/album_item_albumName"
+            app:layout_constraintTop_toBottomOf="@+id/album_item_albumName" />
+
+        <android.support.constraint.Guideline
+            android:id="@+id/album_item_guideline"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            app:layout_constraintGuide_end="36dp" />
+
+        <TextView
+            android:id="@+id/album_item_options"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:paddingLeft="6dp"
+            android:layout_alignParentRight="true"
+            android:layout_alignParentTop="true"
+            android:text="&#8942;"
+            android:textColor="@color/textSecondaryOnDark"
+            android:textAppearance="?android:textAppearanceMedium"
+            app:layout_constraintBottom_toBottomOf="parent"
+            app:layout_constraintEnd_toEndOf="parent"
+            app:layout_constraintHorizontal_bias="0.75"
+            app:layout_constraintStart_toStartOf="@+id/album_item_guideline"
+            app:layout_constraintTop_toTopOf="parent" />
+
+    </android.support.constraint.ConstraintLayout>
+
+</android.support.constraint.ConstraintLayout>
