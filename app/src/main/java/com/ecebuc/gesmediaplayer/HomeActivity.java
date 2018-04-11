@@ -1,6 +1,5 @@
 package com.ecebuc.gesmediaplayer;
 
-import android.net.Uri;
 import android.os.Bundle;
 import android.support.design.widget.NavigationView;
 import android.support.v4.app.FragmentTransaction;
@@ -10,6 +9,7 @@ import android.support.v7.app.ActionBarDrawerToggle;
 import android.support.v7.app.AppCompatActivity;
 import android.support.v7.widget.SearchView;
 import android.support.v7.widget.Toolbar;
+import android.util.Log;
 import android.view.Menu;
 import android.view.MenuItem;
 
@@ -19,9 +19,9 @@ import com.ecebuc.gesmediaplayer.Fragments.SongsFragment;
 
 public class HomeActivity extends AppCompatActivity
         implements NavigationView.OnNavigationItemSelectedListener,
-                    SongsFragment.OnFragmentInteractionListener,
-                    AlbumsFragment.OnFragmentInteractionListener,
-                    ArtistsFragment.OnFragmentInteractionListener {
+                    SongsFragment.OnSongFragmentInteractionListener,
+                    AlbumsFragment.OnAlbumFragmentInteractionListener,
+                    ArtistsFragment.OnArtistFragmentInteractionListener {
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -163,9 +163,12 @@ public class HomeActivity extends AppCompatActivity
     }
 
     @Override
-    public void onFragmentInteraction(Uri uri){
-
+    public void updateToolbarTitleForFragment(String fragmentTitle) {
+        try {
+            getSupportActionBar().setTitle(fragmentTitle);
+        } catch (Exception e){
+            e.printStackTrace();
+            Log.d("updateToolbarSong: ", "setTitle: " + e);
+        }
     }
-
-
 }

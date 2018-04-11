@@ -8,7 +8,6 @@ import android.os.Bundle;
 import android.provider.MediaStore;
 import android.support.v4.app.Fragment;
 import android.support.v7.widget.DefaultItemAnimator;
-import android.support.v7.widget.GridLayoutManager;
 import android.support.v7.widget.LinearLayoutManager;
 import android.support.v7.widget.RecyclerView;
 import android.view.LayoutInflater;
@@ -23,7 +22,7 @@ import java.util.ArrayList;
 
 public class ArtistsFragment extends Fragment {
 
-    private OnFragmentInteractionListener mListener;
+    private OnArtistFragmentInteractionListener artistFragmentCallback;
 
     private RecyclerView artistRecyclerView;
     private RecyclerView.Adapter artistRecyclerAdapter;
@@ -41,11 +40,11 @@ public class ArtistsFragment extends Fragment {
     @Override
     public void onAttach(Context context) {
         super.onAttach(context);
-        if (context instanceof OnFragmentInteractionListener) {
-            mListener = (OnFragmentInteractionListener) context;
+        if (context instanceof OnArtistFragmentInteractionListener) {
+            artistFragmentCallback = (OnArtistFragmentInteractionListener) context;
         } else {
             throw new RuntimeException(context.toString()
-                    + " must implement OnFragmentInteractionListener");
+                    + " must implement OnSongFragmentInteractionListener");
         }
     }
     @Override
@@ -75,21 +74,16 @@ public class ArtistsFragment extends Fragment {
     @Override
     public void onActivityCreated(Bundle savedInstanceState) {
         super.onActivityCreated(savedInstanceState);
-
+        artistFragmentCallback.updateToolbarTitleForFragment("Artists");
     }
     @Override
     public void onDetach() {
         super.onDetach();
-        mListener = null;
+        artistFragmentCallback = null;
     }
 
-    public void onButtonPressed(Uri uri) {
-        if (mListener != null) {
-            mListener.onFragmentInteraction(uri);
-        }
-    }
-    public interface OnFragmentInteractionListener {
-        void onFragmentInteraction(Uri uri);
+    public interface OnArtistFragmentInteractionListener {
+        void updateToolbarTitleForFragment(String fragmentTitle);
     }
 
     private ArrayList<Artist> initArtistLoad() {

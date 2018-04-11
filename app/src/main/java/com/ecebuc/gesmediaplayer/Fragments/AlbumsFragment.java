@@ -26,7 +26,7 @@ import java.util.ArrayList;
 
 public class AlbumsFragment extends Fragment {
 
-    private OnFragmentInteractionListener mListener;
+    private OnAlbumFragmentInteractionListener albumFragmentCallback;
 
     private RecyclerView albumRecyclerView;
     private RecyclerView.Adapter albumRecyclerAdapter;
@@ -44,11 +44,11 @@ public class AlbumsFragment extends Fragment {
     @Override
     public void onAttach(Context context) {
         super.onAttach(context);
-        if (context instanceof OnFragmentInteractionListener) {
-            mListener = (OnFragmentInteractionListener) context;
+        if (context instanceof OnAlbumFragmentInteractionListener) {
+            albumFragmentCallback = (OnAlbumFragmentInteractionListener) context;
         } else {
             throw new RuntimeException(context.toString()
-                    + " must implement OnFragmentInteractionListener");
+                    + " must implement OnAlbumFragmentInteractionListener");
         }
     }
     @Override
@@ -79,21 +79,16 @@ public class AlbumsFragment extends Fragment {
     @Override
     public void onActivityCreated(Bundle savedInstanceState) {
         super.onActivityCreated(savedInstanceState);
-
+        albumFragmentCallback.updateToolbarTitleForFragment("Albums");
     }
     @Override
     public void onDetach() {
         super.onDetach();
-        mListener = null;
+        albumFragmentCallback = null;
     }
 
-    public void onButtonPressed(Uri uri) {
-        if (mListener != null) {
-            mListener.onFragmentInteraction(uri);
-        }
-    }
-    public interface OnFragmentInteractionListener {
-        void onFragmentInteraction(Uri uri);
+    public interface OnAlbumFragmentInteractionListener {
+        void updateToolbarTitleForFragment(String fragmentTitle);
     }
 
     private ArrayList<Album> initAlbumList() {
@@ -147,7 +142,7 @@ public class AlbumsFragment extends Fragment {
 /*public class AlbumsFragment extends Fragment implements
         LoaderManager.LoaderCallbacks<Cursor> {
 
-    private OnFragmentInteractionListener mListener;
+    private OnAlbumFragmentInteractionListener albumFragmentCallback;
     private final static int LOADER_ID = 0;
     private RecyclerView albumRecyclerView;
     private AlbumAdapter albumRecyclerAdapter;
@@ -164,11 +159,11 @@ public class AlbumsFragment extends Fragment {
     @Override
     public void onAttach(Context context) {
         super.onAttach(context);
-        if (context instanceof OnFragmentInteractionListener) {
-            mListener = (OnFragmentInteractionListener) context;
+        if (context instanceof OnAlbumFragmentInteractionListener) {
+            mListener = (OnAlbumFragmentInteractionListener) context;
         } else {
             throw new RuntimeException(context.toString()
-                    + " must implement OnFragmentInteractionListener");
+                    + " must implement OnAlbumFragmentInteractionListener");
         }
     }
     @Override
@@ -231,15 +226,10 @@ public class AlbumsFragment extends Fragment {
 
     public void onDetach() {
         super.onDetach();
-        mListener = null;
+        albumFragmentCallback = null;
     }
 
-    public void onButtonPressed(Uri uri) {
-        if (mListener != null) {
-            mListener.onFragmentInteraction(uri);
-        }
-    }
-    public interface OnFragmentInteractionListener {
-        void onFragmentInteraction(Uri uri);
+    public interface OnAlbumFragmentInteractionListener {
+        void updateToolbarTitleForFragment(String fragmentTitle);
     }
 }*/
