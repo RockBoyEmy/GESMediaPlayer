@@ -25,4 +25,7 @@
     <string name="popup_action_setting2">Setting 2</string>
     <string name="popup_action_setting3">Setting 3</string>
 
+    <!-- TODO: Remove or change this placeholder text -->
+    <string name="hello_blank_fragment">Hello blank fragment</string>
+
 </resources>
