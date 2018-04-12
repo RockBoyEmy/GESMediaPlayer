@@ -11,12 +11,14 @@ import android.util.Log;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
+import android.widget.Toast;
 
 import com.ecebuc.gesmediaplayer.AudioUtils.SongAdapter;
 import com.ecebuc.gesmediaplayer.AudioUtils.StorageUtils;
 import com.ecebuc.gesmediaplayer.Audios.Audio;
 import com.ecebuc.gesmediaplayer.R;
-import com.ecebuc.gesmediaplayer.SimpleDividerItemDecoration;
+import com.ecebuc.gesmediaplayer.Utils.SimpleDividerItemDecoration;
+import com.ecebuc.gesmediaplayer.Utils.RecyclerTouchListener;
 
 import java.util.ArrayList;
 
@@ -73,7 +75,7 @@ public class SongsFragment extends Fragment {
         View rootView = inflater.inflate(R.layout.fragment_songs, container, false);
 
         //get the songs list for the recyclerview adapter
-        ArrayList<Audio> songList;
+        final ArrayList<Audio> songList;
         StorageUtils storageUtils = new StorageUtils(getActivity());
         songList = storageUtils.loadAudio();
 
@@ -88,6 +90,19 @@ public class SongsFragment extends Fragment {
         songRecyclerAdapter = new SongAdapter(songList);
         songRecyclerView.setAdapter(songRecyclerAdapter);
         songRecyclerView.setItemAnimator(new DefaultItemAnimator());
+        songRecyclerView.addOnItemTouchListener(
+                new RecyclerTouchListener(getContext(), songRecyclerView, new RecyclerTouchListener.ClickListener() {
+            @Override
+            public void onClick(View view, int position) {
+                Audio selectedSong = songList.get(position);
+                Toast.makeText(getContext(), selectedSong.getTitle() + " is selected!", Toast.LENGTH_SHORT).show();
+            }
+
+            @Override
+            public void onLongClick(View view, int position) {
+                Toast.makeText(getContext(), "Long selected", Toast.LENGTH_SHORT).show();
+            }
+        }));
 
         return rootView;
     }

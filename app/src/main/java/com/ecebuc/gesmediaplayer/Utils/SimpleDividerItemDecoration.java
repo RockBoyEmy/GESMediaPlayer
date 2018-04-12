@@ -1,4 +1,4 @@
-package com.ecebuc.gesmediaplayer;
+package com.ecebuc.gesmediaplayer.Utils;
 
 import android.content.Context;
 import android.graphics.Canvas;
@@ -6,6 +6,8 @@ import android.graphics.drawable.Drawable;
 import android.support.v4.content.ContextCompat;
 import android.support.v7.widget.RecyclerView;
 import android.view.View;
+
+import com.ecebuc.gesmediaplayer.R;
 
 public class SimpleDividerItemDecoration extends RecyclerView.ItemDecoration {
     private Drawable mDivider;

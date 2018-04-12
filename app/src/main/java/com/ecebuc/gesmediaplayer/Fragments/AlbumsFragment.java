@@ -17,10 +17,12 @@ import android.support.v7.widget.RecyclerView;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
+import android.widget.Toast;
 
 import com.ecebuc.gesmediaplayer.AudioUtils.AlbumAdapter;
 import com.ecebuc.gesmediaplayer.Audios.Album;
 import com.ecebuc.gesmediaplayer.R;
+import com.ecebuc.gesmediaplayer.Utils.RecyclerTouchListener;
 
 import java.util.ArrayList;
 
@@ -73,6 +75,19 @@ public class AlbumsFragment extends Fragment {
         albumRecyclerView.setAdapter(albumRecyclerAdapter);
         //albumRecyclerAdapter.notifyDataSetChanged();
         albumRecyclerView.setItemAnimator(new DefaultItemAnimator());
+        albumRecyclerView.addOnItemTouchListener(
+                new RecyclerTouchListener(getContext(), albumRecyclerView, new RecyclerTouchListener.ClickListener() {
+                    @Override
+                    public void onClick(View view, int position) {
+                        Album selectedAlbum = albumList.get(position);
+                        Toast.makeText(getContext(), selectedAlbum.getAlbumName() + " is selected!", Toast.LENGTH_SHORT).show();
+                    }
+
+                    @Override
+                    public void onLongClick(View view, int position) {
+                        Toast.makeText(getContext(), "Long selected", Toast.LENGTH_SHORT).show();
+                    }
+                }));
 
         return rootView;
     }

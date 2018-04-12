@@ -5,6 +5,9 @@
     android:id="@+id/recycler_artist_item"
     android:layout_width="match_parent"
     android:layout_height="@dimen/recycler_list_item"
+    android:foreground="?android:attr/selectableItemBackground"
+    android:clickable="true"
+    android:focusable="true"
     android:scrollbars="vertical">
 
     <TextView
@@ -39,6 +42,7 @@
         android:layout_height="wrap_content"
         android:layout_marginStart="4dp"
         android:text="|"
+        android:textColor="@color/textSecondaryOnDark"
         android:textSize="@dimen/text_subtitle"
         android:textStyle="bold"
         app:layout_constraintBaseline_toBaselineOf="@+id/artist_item_albumsNumber"

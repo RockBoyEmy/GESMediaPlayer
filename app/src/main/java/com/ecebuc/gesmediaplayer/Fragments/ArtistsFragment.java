@@ -13,11 +13,13 @@ import android.support.v7.widget.RecyclerView;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
+import android.widget.Toast;
 
 import com.ecebuc.gesmediaplayer.AudioUtils.ArtistAdapter;
 import com.ecebuc.gesmediaplayer.Audios.Artist;
 import com.ecebuc.gesmediaplayer.R;
-import com.ecebuc.gesmediaplayer.SimpleDividerItemDecoration;
+import com.ecebuc.gesmediaplayer.Utils.RecyclerTouchListener;
+import com.ecebuc.gesmediaplayer.Utils.SimpleDividerItemDecoration;
 
 import java.util.ArrayList;
 
@@ -70,6 +72,19 @@ public class ArtistsFragment extends Fragment {
         artistRecyclerAdapter = new ArtistAdapter(artistList);
         artistRecyclerView.setAdapter(artistRecyclerAdapter);
         artistRecyclerView.setItemAnimator(new DefaultItemAnimator());
+        artistRecyclerView.addOnItemTouchListener(
+                new RecyclerTouchListener(getContext(), artistRecyclerView, new RecyclerTouchListener.ClickListener() {
+                    @Override
+                    public void onClick(View view, int position) {
+                        Artist selectedArtist = artistList.get(position);
+                        Toast.makeText(getContext(), selectedArtist.getArtistName() + " is selected!", Toast.LENGTH_SHORT).show();
+                    }
+
+                    @Override
+                    public void onLongClick(View view, int position) {
+                        Toast.makeText(getContext(), "Long selected", Toast.LENGTH_SHORT).show();
+                    }
+                }));
 
         return rootView;
     }

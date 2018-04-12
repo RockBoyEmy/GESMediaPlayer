@@ -677,7 +677,7 @@ public class MediaPlaybackService extends MediaBrowserServiceCompat implements
                 .setContentIntent(clickActivityStart) //TODO doesn't work well for now, restarts, leaking receivers
 
                 // Stop the service when the notification is swiped away //TODO: not working, see cancelButton
-                .setDeleteIntent(stopPendingIntent)
+                //.setDeleteIntent(stopPendingIntent)
 
                 // Make the transport controls visible on the lockscreen
                 .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
