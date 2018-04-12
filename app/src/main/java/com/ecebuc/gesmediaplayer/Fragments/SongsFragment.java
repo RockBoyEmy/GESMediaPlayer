@@ -16,6 +16,7 @@ import com.ecebuc.gesmediaplayer.AudioUtils.SongAdapter;
 import com.ecebuc.gesmediaplayer.AudioUtils.StorageUtils;
 import com.ecebuc.gesmediaplayer.Audios.Audio;
 import com.ecebuc.gesmediaplayer.R;
+import com.ecebuc.gesmediaplayer.SimpleDividerItemDecoration;
 
 import java.util.ArrayList;
 
@@ -79,6 +80,7 @@ public class SongsFragment extends Fragment {
         //Recycler view setup for songs display
         songRecyclerView = (RecyclerView) rootView.findViewById(R.id.songs_recycler_view);
         songRecyclerView.setHasFixedSize(true);
+        songRecyclerView.addItemDecoration(new SimpleDividerItemDecoration(getContext()));
 
         recyclerLayoutManager = new LinearLayoutManager(getActivity());
         songRecyclerView.setLayoutManager(recyclerLayoutManager);

@@ -4,7 +4,7 @@
     xmlns:app="http://schemas.android.com/apk/res-auto"
     android:id="@+id/recycler_song_item"
     android:layout_width="match_parent"
-    android:layout_height="@dimen/recycler_list_song_item"
+    android:layout_height="@dimen/recycler_list_item"
     android:scrollbars="vertical">
 
     <TextView

@@ -17,6 +17,7 @@ import android.view.ViewGroup;
 import com.ecebuc.gesmediaplayer.AudioUtils.ArtistAdapter;
 import com.ecebuc.gesmediaplayer.Audios.Artist;
 import com.ecebuc.gesmediaplayer.R;
+import com.ecebuc.gesmediaplayer.SimpleDividerItemDecoration;
 
 import java.util.ArrayList;
 
@@ -61,6 +62,7 @@ public class ArtistsFragment extends Fragment {
 
         artistRecyclerView = (RecyclerView) rootView.findViewById(R.id.artists_recycler_view);
         artistRecyclerView.setHasFixedSize(true);
+        artistRecyclerView.addItemDecoration(new SimpleDividerItemDecoration(getContext()));
 
         recyclerLayoutManager = new LinearLayoutManager(getActivity());
         artistRecyclerView.setLayoutManager(recyclerLayoutManager);
