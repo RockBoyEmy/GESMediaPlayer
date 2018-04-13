@@ -14,7 +14,9 @@ import android.support.v7.widget.RecyclerView;
 
 import com.ecebuc.gesmediaplayer.Audios.Album;
 import com.ecebuc.gesmediaplayer.R;
+import com.squareup.picasso.Picasso;
 
+import java.io.File;
 import java.util.ArrayList;
 
 import static android.content.ContentValues.TAG;
@@ -61,10 +63,12 @@ public class AlbumAdapter extends RecyclerView.Adapter<AlbumAdapter.ViewHolder> 
         // - get element from your dataset at this position
         // - replace the contents of the view with that element
         Album currentAlbum = albumList.get(position);
+        String albumCover = currentAlbum.getAlbumArt();
         holder.albumRecyclerTitleView.setText(currentAlbum.getAlbumName());
         holder.albumRecyclerArtistView.setText(currentAlbum.getAlbumArtist());
         if(currentAlbum.getAlbumArt() != null){
-            holder.albumRecyclerArtView.setImageBitmap(BitmapFactory.decodeFile(currentAlbum.getAlbumArt()));
+            Picasso.get().load(new File(albumCover)).fit().centerCrop().into(holder.albumRecyclerArtView);
+            //holder.albumRecyclerArtView.setImageBitmap(BitmapFactory.decodeFile(currentAlbum.getAlbumArt()));
         }
     }
 

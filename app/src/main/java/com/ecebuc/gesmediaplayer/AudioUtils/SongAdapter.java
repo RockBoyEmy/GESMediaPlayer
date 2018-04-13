@@ -10,7 +10,9 @@ import android.widget.TextView;
 
 import com.ecebuc.gesmediaplayer.Audios.Audio;
 import com.ecebuc.gesmediaplayer.R;
+import com.squareup.picasso.Picasso;
 
+import java.io.File;
 import java.util.ArrayList;
 
 public class SongAdapter extends RecyclerView.Adapter<SongAdapter.ViewHolder> {
@@ -59,7 +61,8 @@ public class SongAdapter extends RecyclerView.Adapter<SongAdapter.ViewHolder> {
         holder.songRecyclerTitleView.setText(currentSong.getTitle());
         holder.songRecyclerArtistView.setText(currentSong.getArtist());
         if(cover != null){
-            holder.songRecyclerCoverView.setImageBitmap(BitmapFactory.decodeFile(cover));
+            Picasso.get().load(new File(cover)).resize(38, 38).centerCrop().into(holder.songRecyclerCoverView);
+            //holder.songRecyclerCoverView.setImageBitmap(BitmapFactory.decodeFile(cover));
         }
     }
 
