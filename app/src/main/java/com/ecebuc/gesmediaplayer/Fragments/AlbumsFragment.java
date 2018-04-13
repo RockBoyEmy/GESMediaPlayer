@@ -5,15 +5,13 @@ import android.content.Context;
 import android.database.Cursor;
 import android.net.Uri;
 import android.os.Bundle;
+import android.os.Handler;
 import android.provider.MediaStore;
-import android.support.annotation.Nullable;
 import android.support.v4.app.Fragment;
-import android.support.v4.app.LoaderManager;
-import android.support.v4.content.CursorLoader;
-import android.support.v4.content.Loader;
 import android.support.v7.widget.DefaultItemAnimator;
 import android.support.v7.widget.GridLayoutManager;
 import android.support.v7.widget.RecyclerView;
+import android.util.Log;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
@@ -33,7 +31,13 @@ public class AlbumsFragment extends Fragment {
     private RecyclerView albumRecyclerView;
     private RecyclerView.Adapter albumRecyclerAdapter;
     private RecyclerView.LayoutManager recyclerLayoutManager;
-    private ArrayList<Album> albumList;
+    private ArrayList<Album> albumList = new ArrayList<>();
+
+    private final String IS_FRAGMENT_TYPE_DEFAULT_TAG = "isFragmentDefaultTag";
+    private final String fromArtistIDParamTAG = "Artist ID";
+    private boolean paramIsFragmentDefault;
+    private String paramArtistID;
+    private String fragmentTitle;
 
     public AlbumsFragment() {
         // Required empty public constructor
@@ -57,8 +61,24 @@ public class AlbumsFragment extends Fragment {
     public void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
 
+        Bundle args = getArguments();
+        paramIsFragmentDefault = args.getBoolean(IS_FRAGMENT_TYPE_DEFAULT_TAG, true);
+
+        if(paramIsFragmentDefault){
+            //default behavior - display all albums
+            initAlbumList();
+            fragmentTitle = "Albums";
+        } else {
+            //fragment was created with arguments - handle accordingly
+            paramArtistID = args.getString(fromArtistIDParamTAG);
+            if(paramArtistID != null){
+                initAlbumListFromId(paramArtistID);
+            } else {
+                Log.e("AlbumFrag onCreate: ", "error - paramArtistID is null");
+            }
+        }
         //populating the list with the albums on device
-        albumList = initAlbumList();
+        //albumList = initAlbumList();
     }
     @Override
     public View onCreateView(LayoutInflater inflater, ViewGroup container, Bundle savedInstanceState) {
@@ -73,19 +93,21 @@ public class AlbumsFragment extends Fragment {
 
         albumRecyclerAdapter = new AlbumAdapter(albumList);
         albumRecyclerView.setAdapter(albumRecyclerAdapter);
-        //albumRecyclerAdapter.notifyDataSetChanged();
         albumRecyclerView.setItemAnimator(new DefaultItemAnimator());
         albumRecyclerView.addOnItemTouchListener(
                 new RecyclerTouchListener(getContext(), albumRecyclerView, new RecyclerTouchListener.ClickListener() {
                     @Override
                     public void onClick(View view, int position) {
                         Album selectedAlbum = albumList.get(position);
-                        Toast.makeText(getContext(), selectedAlbum.getAlbumName() + " is selected!", Toast.LENGTH_SHORT).show();
+                        String albumId = selectedAlbum.getAlbumId();
+                        albumFragmentCallback.startSongsFragmentFromId(albumId);
+                        //Toast.makeText(getContext(), selectedAlbum.getAlbumName() + " is selected!", Toast.LENGTH_SHORT).show();
                     }
 
                     @Override
                     public void onLongClick(View view, int position) {
                         Toast.makeText(getContext(), "Long selected", Toast.LENGTH_SHORT).show();
+                        //could implement the popup menu in here
                     }
                 }));
 
@@ -94,7 +116,7 @@ public class AlbumsFragment extends Fragment {
     @Override
     public void onActivityCreated(Bundle savedInstanceState) {
         super.onActivityCreated(savedInstanceState);
-        albumFragmentCallback.updateToolbarTitleForFragment("Albums");
+        albumFragmentCallback.updateToolbarTitleForFragment(fragmentTitle);
     }
     @Override
     public void onDetach() {
@@ -104,25 +126,93 @@ public class AlbumsFragment extends Fragment {
 
     public interface OnAlbumFragmentInteractionListener {
         void updateToolbarTitleForFragment(String fragmentTitle);
+        void startSongsFragmentFromId(String albumId);
     }
 
-    private ArrayList<Album> initAlbumList() {
+    private void /*ArrayList<Album>*/ initAlbumList() {
+        //this function populates the global albumList directly through the parallel thread
         ContentResolver contentResolver = getActivity().getContentResolver();
-        String albumId, albumTitle, albumArtist, albumArt;
-        ArrayList<Album> albumList = new ArrayList<>();
+        Handler albumLoadHandler;
+        Runnable albumLoadRunnable;
+        final int TIMES_TO_NEXT_ADAPTER_NOTIFY = 5;
+        //ArrayList<Album> albumList = new ArrayList<>();
+
         final String[] ALBUM_SUMMARY_PROJECTION = {
                 MediaStore.Audio.Albums._ID,
                 MediaStore.Audio.Albums.ALBUM,
                 MediaStore.Audio.Albums.ARTIST,
-                MediaStore.Audio.Albums.ALBUM_ART };
+                MediaStore.Audio.Albums.ALBUM_ART};
 
         Uri albumUri = MediaStore.Audio.Albums.EXTERNAL_CONTENT_URI;
         String sortOrder = MediaStore.Audio.Albums.ALBUM + " ASC";
-        Cursor cursor = contentResolver.query(
+        final Cursor cursor = contentResolver.query(
                 albumUri,
                 ALBUM_SUMMARY_PROJECTION,
                 null, null,
                 sortOrder);
+
+        Log.d("initAlbumList: ", "Album query performed");
+
+        albumLoadHandler = new Handler();
+        albumLoadRunnable = new Runnable() {
+            @Override
+            public void run() {
+                String albumId, albumTitle, albumArtist, albumArt;
+                Cursor runnableCursor = cursor;
+                int notifyCounter = TIMES_TO_NEXT_ADAPTER_NOTIFY;
+
+                if (runnableCursor != null && runnableCursor.getCount() > 0) {
+                    while (runnableCursor.moveToNext()) {
+                        albumId = runnableCursor.getString(runnableCursor.getColumnIndex(MediaStore.Audio.Albums._ID));
+                        albumTitle = runnableCursor.getString(runnableCursor.getColumnIndex(MediaStore.Audio.Albums.ALBUM));
+                        albumArtist = runnableCursor.getString(runnableCursor.getColumnIndex(MediaStore.Audio.Albums.ARTIST));
+                        albumArt = runnableCursor.getString(runnableCursor.getColumnIndex(MediaStore.Audio.Albums.ALBUM_ART));
+
+                        // Save to albumList
+                        albumList.add(new Album(albumId, albumTitle, albumArtist, albumArt));
+                        Log.d("initAlbumLoad: ", "added " + albumTitle + " to the list");
+                        Log.d("initAlbumLoad: ", "notifyCounter is: " + notifyCounter);
+                        notifyCounter--;
+
+                        //if dataset was updated the set amount of times, notify adapter
+                        if (notifyCounter == 0) {
+                            albumRecyclerAdapter.notifyDataSetChanged();
+                            Log.d("initAlbumLoad: ", "adapter notified");
+                            notifyCounter = 5;
+                        }
+                    }
+
+                    //when all device files have been loaded, notify adapter one last time
+                    albumRecyclerAdapter.notifyDataSetChanged();
+                    Log.d("initAlbumLoad: ", "adapter notified the last time");
+                }
+                runnableCursor.close();
+                if (albumList.isEmpty()) {
+                    Toast.makeText(getActivity(), "There are no albums on device", Toast.LENGTH_SHORT).show();
+                }
+            }
+        };
+        albumLoadHandler.post(albumLoadRunnable);
+    }
+    private void initAlbumListFromId(String id){
+        ContentResolver contentResolver = getActivity().getContentResolver();
+        String albumId, albumTitle, albumArtist, albumArt;
+        long artistId = Long.parseLong(id);
+
+        final String[] ALBUM_SUMMARY_PROJECTION = {
+                MediaStore.Audio.Albums._ID,
+                MediaStore.Audio.Albums.ALBUM,
+                MediaStore.Audio.Albums.ARTIST,
+                MediaStore.Audio.Albums.ALBUM_ART};
+
+        Uri albumUri = MediaStore.Audio.Artists.Albums.getContentUri("external", artistId);
+        String sortOrder = MediaStore.Audio.Albums.ALBUM + " ASC";
+        final Cursor cursor = contentResolver.query(
+                albumUri,
+                ALBUM_SUMMARY_PROJECTION,
+                null, null,
+                sortOrder);
+
 
         if (cursor != null && cursor.getCount() > 0) {
             while (cursor.moveToNext()) {
@@ -131,23 +221,17 @@ public class AlbumsFragment extends Fragment {
                 albumArtist = cursor.getString(cursor.getColumnIndex(MediaStore.Audio.Albums.ARTIST));
                 albumArt = cursor.getString(cursor.getColumnIndex(MediaStore.Audio.Albums.ALBUM_ART));
 
-                //in case there is no album art
-                /*if(albumArt == null){
-                    albumArt = BitmapFactory.(getResources(), R.drawable.ic_album_black_24dp);
-                }*/
                 // Save to albumList
                 albumList.add(new Album(albumId, albumTitle, albumArtist, albumArt));
             }
+            //set the fragment name to the artist of which we are displaying the albums
+            cursor.moveToPrevious();
+            fragmentTitle = cursor.getString(cursor.getColumnIndex(MediaStore.Audio.Albums.ARTIST));
         }
         cursor.close();
-
-        if(albumList.isEmpty()) {
-            return null;
-        } else {
-          return albumList;
-        }
     }
 }
+
 
 
 
@@ -166,7 +250,7 @@ public class AlbumsFragment extends Fragment {
 
     public AlbumsFragment() {
     }
-    public static AlbumsFragment newInstance(String param1, String param2) {
+    public static AlbumsFragment newInstance(String paramArtistID, String param2) {
         AlbumsFragment fragment = new AlbumsFragment();
         return fragment;
     }

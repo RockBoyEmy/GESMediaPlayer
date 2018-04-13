@@ -30,7 +30,7 @@ public class ArtistsFragment extends Fragment {
     private RecyclerView artistRecyclerView;
     private RecyclerView.Adapter artistRecyclerAdapter;
     private RecyclerView.LayoutManager recyclerLayoutManager;
-    private ArrayList<Artist> artistList;
+    private ArrayList<Artist> artistList = new ArrayList<>();
 
     public ArtistsFragment() {
         // Required empty public constructor
@@ -77,7 +77,9 @@ public class ArtistsFragment extends Fragment {
                     @Override
                     public void onClick(View view, int position) {
                         Artist selectedArtist = artistList.get(position);
-                        Toast.makeText(getContext(), selectedArtist.getArtistName() + " is selected!", Toast.LENGTH_SHORT).show();
+                        String artistId = selectedArtist.getArtistId();
+                        artistFragmentCallback.startAlbumsFragmentFromId(artistId);
+                        //Toast.makeText(getContext(), selectedArtist.getArtistName() + " is selected!", Toast.LENGTH_SHORT).show();
                     }
 
                     @Override
@@ -101,6 +103,7 @@ public class ArtistsFragment extends Fragment {
 
     public interface OnArtistFragmentInteractionListener {
         void updateToolbarTitleForFragment(String fragmentTitle);
+        void startAlbumsFragmentFromId(String artistId);
     }
 
     private ArrayList<Artist> initArtistLoad() {

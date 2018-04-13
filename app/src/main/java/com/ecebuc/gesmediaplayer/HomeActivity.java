@@ -23,14 +23,14 @@ public class HomeActivity extends AppCompatActivity
                     AlbumsFragment.OnAlbumFragmentInteractionListener,
                     ArtistsFragment.OnArtistFragmentInteractionListener {
 
+    final String IS_FRAGMENT_TYPE_DEFAULT_TAG = "isFragmentDefaultTag";
+
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_home);
 
-        //setting up the fragments stuff
-        // Check that the activity is using the layout version with
-        // the fragment_container FrameLayout
+        // Check that the activity is using the correct layout version for fragments
         if (findViewById(R.id.home_fragment_container) != null) {
 
             // However, if we're being restored from a previous state,
@@ -40,8 +40,11 @@ public class HomeActivity extends AppCompatActivity
                 return;
             }
 
+            Bundle args = new Bundle();
+
             // Create a new Fragment to be placed in the activity layout
             SongsFragment firstFragment = new SongsFragment();
+            firstFragment.setArguments(args);
 
             // In case this activity was started with special instructions from an
             // Intent, pass the Intent's extras to the fragment as arguments
@@ -117,6 +120,7 @@ public class HomeActivity extends AppCompatActivity
     public boolean onNavigationItemSelected(MenuItem item) {
         // Handle navigation view item clicks here.
         FragmentTransaction fragmentTransaction;
+        Bundle fragmentArgs = new Bundle();
         int id = item.getItemId();
 
         switch (id) {
@@ -125,29 +129,33 @@ public class HomeActivity extends AppCompatActivity
             case R.id.nav_all_songs:
                 // Create the songs fragment
                 SongsFragment songsFragment = new SongsFragment();
+                //fragmentArgs.putBoolean(IS_FRAGMENT_TYPE_DEFAULT_TAG, true);
+                songsFragment.setArguments(fragmentArgs);
+
                 fragmentTransaction = getSupportFragmentManager().beginTransaction();
-
-                // Replace whatever is in the fragment_container view with this fragment,
-                // and add the transaction to the back stack so the user can navigate back
                 fragmentTransaction.replace(R.id.home_fragment_container, songsFragment);
-                fragmentTransaction.addToBackStack(null);
-
-                // Commit the transaction
+                //fragmentTransaction.addToBackStack(null);
                 fragmentTransaction.commit();
                 break;
 
             case R.id.nav_artists:
                 ArtistsFragment artistsFragment = new ArtistsFragment();
+                //fragmentArgs.putBoolean(IS_FRAGMENT_TYPE_DEFAULT_TAG, true);
+                artistsFragment.setArguments(fragmentArgs);
+
                 fragmentTransaction = getSupportFragmentManager().beginTransaction();
                 fragmentTransaction.replace(R.id.home_fragment_container, artistsFragment);
-                fragmentTransaction.addToBackStack(null);
+                //fragmentTransaction.addToBackStack(null);
                 fragmentTransaction.commit();
                 break;
             case R.id.nav_albums:
                 AlbumsFragment albumsFragment = new AlbumsFragment();
+                //fragmentArgs.putBoolean(IS_FRAGMENT_TYPE_DEFAULT_TAG, true);
+                albumsFragment.setArguments(fragmentArgs);
+
                 fragmentTransaction = getSupportFragmentManager().beginTransaction();
                 fragmentTransaction.replace(R.id.home_fragment_container, albumsFragment);
-                fragmentTransaction.addToBackStack(null);
+                //fragmentTransaction.addToBackStack(null);
                 fragmentTransaction.commit();
                 break;
 
@@ -170,5 +178,31 @@ public class HomeActivity extends AppCompatActivity
             e.printStackTrace();
             Log.d("updateToolbarSong: ", "setTitle: " + e);
         }
+    }
+    @Override
+    public void startAlbumsFragmentFromId(String artistId){
+        Bundle fragmentArgs = new Bundle();
+        fragmentArgs.putString("Artist ID", artistId);
+        fragmentArgs.putBoolean(IS_FRAGMENT_TYPE_DEFAULT_TAG, false);
+
+        FragmentTransaction fragmentTransaction = getSupportFragmentManager().beginTransaction();
+        AlbumsFragment albumFromIdFragment = new AlbumsFragment();
+        albumFromIdFragment.setArguments(fragmentArgs);
+        fragmentTransaction.replace(R.id.home_fragment_container, albumFromIdFragment);
+        fragmentTransaction.addToBackStack(null);
+        fragmentTransaction.commit();
+    }
+    @Override
+    public void startSongsFragmentFromId(String albumId){
+        Bundle fragmentArgs = new Bundle();
+        fragmentArgs.putString("Album ID", albumId);
+        fragmentArgs.putBoolean(IS_FRAGMENT_TYPE_DEFAULT_TAG, false);
+
+        FragmentTransaction fragmentTransaction = getSupportFragmentManager().beginTransaction();
+        SongsFragment songFromIdFragment = new SongsFragment();
+        songFromIdFragment.setArguments(fragmentArgs);
+        fragmentTransaction.replace(R.id.home_fragment_container, songFromIdFragment);
+        fragmentTransaction.addToBackStack(null);
+        fragmentTransaction.commit();
     }
 }
