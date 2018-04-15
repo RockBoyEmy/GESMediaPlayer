@@ -1,5 +1,6 @@
 package com.ecebuc.gesmediaplayer;
 
+import android.app.Notification;
 import android.app.NotificationChannel;
 import android.app.PendingIntent;
 import android.content.BroadcastReceiver;
@@ -45,164 +46,27 @@ public class MediaPlaybackService extends MediaBrowserServiceCompat implements
 
         AudioManager.OnAudioFocusChangeListener {
 
-    public static final int NOTIFICATION_ID = 123;
     public static boolean isServiceStarted = false;
 
-    private static int audioIndex = -1;
     private ArrayList<Audio> audioList;
     private Audio activeAudio = null;
+    private static int audioIndex = -1;
     private int pausedPosition;
 
     private MediaPlayer gesMediaPlayer;
     private MediaSessionCompat gesMediaSession;
     private MediaControllerCompat.TransportControls transportControls;
 
+    private Notification gesNotification;
+    private NotificationManager gesNotificationManager;
+    public static final int NOTIFICATION_ID = 123;
+    public static final String CHANNEL_ID = "com.ecebuc.gesmediaplayer.NOTIFICATION_CHANNEL_ID";
 
-    public static final String ACTION_PLAY = "com.example.gesmediaplayer.ACTION_PLAY";
-    public static final String ACTION_PAUSE = "com.example.gesmediaplayer.ACTION_PAUSE";
-    public static final String ACTION_PREVIOUS = "com.example.gesmediaplayer.ACTION_PREVIOUS";
-    public static final String ACTION_NEXT = "com.example.gesmediaplayer.ACTION_NEXT";
-    public static final String ACTION_STOP = "com.example.gesmediaplayer.ACTION_STOP";
-    public static final String CHANNEL_ID = "com.example.gesmediaplayer.NOTIFICATION_CHANNEL_ID";
-
-
-
-    //-------------------------------------Lifecycle methods--------------------------------------//
-
-    @Override
-    public void onCreate() {
-        super.onCreate();
-
-        Log.d("service onCreate: ", "Service created");
-        registerAudioLoadCompleteReceiver();
-        initMediaPlayer();
-        initMediaSession();
-        callStateListener();
-
-        // Set an initial PlaybackState with ACTION_PLAY, so media buttons can start the player
-        // Very much needed to avoid lots of NullPtrExceptions with getPlaybackState()
-        PlaybackStateCompat.Builder playbackStateBuilder = new PlaybackStateCompat.Builder()
-                .setActions(PlaybackStateCompat.ACTION_PLAY |
-                            PlaybackStateCompat.ACTION_PLAY_PAUSE);
-        gesMediaSession.setPlaybackState(playbackStateBuilder.build()); //translates to STATE_NONE
-
-        //create a notification channel for displaying notifications on API 26+
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            // Create the NotificationChannel
-            String name = "GES Notification Channel";
-            String description = "This is the GES Media Player notification channel - test";
-            int importance = NotificationManager.IMPORTANCE_DEFAULT;
-            long vibrationP[] = {0}; //to eliminate vibration for every command on notification
-
-            NotificationChannel mChannel = new NotificationChannel(CHANNEL_ID, name, importance);
-            mChannel.setDescription(description);
-            mChannel.setVibrationPattern(vibrationP);
-            // Register the channel with the system; you can't change the importance
-            // or other notification behaviors after this
-            NotificationManager notificationManager = (NotificationManager) getSystemService(
-                    NOTIFICATION_SERVICE);
-            notificationManager.createNotificationChannel(mChannel);
-        }
-        Log.d("service onCreate: ", "exited service onCreate");
-    }
-    @Override
-    public void onDestroy() {
-        super.onDestroy();
-
-        Log.d("service onDestroy: ", "onDestroy just entered");
-        //Disable the PhoneStateListener
-        if (phoneStateListener != null) {
-            telephonyManager.listen(phoneStateListener, PhoneStateListener.LISTEN_NONE);
-        }
-
-        /*//clear cached playlist
-        //new StorageUtils(getApplicationContext()).clearCachedAudioPlaylist();*/
-
-        gesMediaSession.release();
-        unregisterReceiver(audioLoadComplete);
-
-        /*handle app crash when it is started but no music is played, as
-        * the broadcast receiver is never being registered, giving error
-        * when entering onDestroy with an unregistered receiver*/
-        if(isServiceStarted){
-            unregisterReceiver(notificationPlaybackCommand);
-        }
-        Log.d("service onDestroy: ", "everything unregistered and cleared in service, exiting...");
-    }
-
-    @Override
-    public int onStartCommand(Intent intent, int flags, int startId) {
-        Log.d("onStartCommand: ", "Service has been started");
-        isServiceStarted = true;
-        registerNotificationCommandReceiver();
-
-        if(activeAudio == null){
-            audioIndex = 0;
-            activeAudio = audioList.get(audioIndex);
-        }
-
-        try {
-            //sets current song as data source for media player
-            gesMediaPlayer.setDataSource(activeAudio.getData());
-            gesMediaPlayer.prepareAsync();
-        } catch (IOException e) {
-            e.printStackTrace();
-            Log.e("MUSIC SERVICE", "Error setting data source", e);
-            stopSelf();
-        }
-
-        PlaybackStateCompat pbState = gesMediaSession.getController().getPlaybackState();
-        Log.d("onPlay: ", "current playback state is: " + pbState.getState());
-
-        MediaButtonReceiver.handleIntent(gesMediaSession, intent);
-        //createNotification();
-        //handleIncomingActions(intent);
-        Log.d("onStartCommand: ", "exited onStartCommand method");
-        return super.onStartCommand(intent, flags, startId);
-    }
-    @Override
-    public void onCompletion(MediaPlayer mediaPlayer) {
-        if( gesMediaPlayer != null ) {
-            //gesMediaPlayer.reset();
-            transportControls.skipToNext();
-            //should not reset in here because it breaks controls of the
-            //notification as the song changes, should only skip to next
-        }
-    }
-    @Override
-    public boolean onError(MediaPlayer mp, int what, int extra) {
-        //Invoked when there has been an error for an asynchronous operation.
-        switch (what) {
-            case MediaPlayer.MEDIA_ERROR_NOT_VALID_FOR_PROGRESSIVE_PLAYBACK:
-                Log.d("MediaPlayer Error",
-                        "MEDIA ERROR NOT VALID FOR PROGRESSIVE PLAYBACK " + extra);
-                break;
-            case MediaPlayer.MEDIA_ERROR_SERVER_DIED:
-                Log.d("MediaPlayer Error",
-                        "MEDIA ERROR SERVER DIED " + extra);
-                break;
-            case MediaPlayer.MEDIA_ERROR_UNKNOWN:
-                Log.d("MediaPlayer Error",
-                        "MEDIA ERROR UNKNOWN " + extra);
-                break;
-            case MediaPlayer.MEDIA_ERROR_UNSUPPORTED:
-                Log.d("MediaPlayer Error",
-                        "MEDIA ERROR UNSUPPORTED " + extra);
-                break;
-        }
-        return false;
-        //TODO: documentation talks about mediaPlayer needing reset here before
-        //being able to use it again
-    }
-    @Override
-    public void onPrepared(MediaPlayer mp){
-        Log.d("onPrepared: ", "Media Player is ready for playback");
-        gesMediaPlayer.start();
-        setMediaPlaybackState(PlaybackStateCompat.STATE_PLAYING);
-        createNotification();
-        registerNoisyReceiver();
-    }
-
+    public static final String ACTION_PLAY = "com.ecebuc.gesmediaplayer.ACTION_PLAY";
+    public static final String ACTION_PAUSE = "com.ecebuc.gesmediaplayer.ACTION_PAUSE";
+    public static final String ACTION_PREVIOUS = "com.ecebuc.gesmediaplayer.ACTION_PREVIOUS";
+    public static final String ACTION_NEXT = "com.ecebuc.gesmediaplayer.ACTION_NEXT";
+    public static final String ACTION_STOP = "com.ecebuc.gesmediaplayer.ACTION_STOP";
 
 
     //----------------------------------------Initializers----------------------------------------//
@@ -224,7 +88,7 @@ public class MediaPlaybackService extends MediaBrowserServiceCompat implements
 
         gesMediaSession.setCallback(mediaSessionCallbacks);
         gesMediaSession.setFlags( MediaSessionCompat.FLAG_HANDLES_MEDIA_BUTTONS |
-                MediaSessionCompat.FLAG_HANDLES_TRANSPORT_CONTROLS );
+                                    MediaSessionCompat.FLAG_HANDLES_TRANSPORT_CONTROLS );
         transportControls = gesMediaSession.getController().getTransportControls();
 
         //this is for pre-Lollipop media button handling on those devices
@@ -271,6 +135,18 @@ public class MediaPlaybackService extends MediaBrowserServiceCompat implements
 
         registerReceiver(notificationPlaybackCommand, notificationFilter);
     }
+    private void setMediaPlaybackState(int state) {
+        PlaybackStateCompat.Builder playbackstateBuilder = new PlaybackStateCompat.Builder();
+        if( state == PlaybackStateCompat.STATE_PLAYING ) {
+            playbackstateBuilder.setActions(PlaybackStateCompat.ACTION_PLAY_PAUSE |
+                    PlaybackStateCompat.ACTION_PAUSE);
+        } else {
+            playbackstateBuilder.setActions(PlaybackStateCompat.ACTION_PLAY_PAUSE |
+                    PlaybackStateCompat.ACTION_PLAY);
+        }
+        playbackstateBuilder.setState(state, PlaybackStateCompat.PLAYBACK_POSITION_UNKNOWN, 0);
+        gesMediaSession.setPlaybackState(playbackstateBuilder.build());
+    }
     private void updateMetaData() {
         Bitmap albumArt = BitmapFactory.decodeResource(getResources(),
                 R.drawable.skepty_face); //image cover in ../res/drawable/
@@ -284,10 +160,136 @@ public class MediaPlaybackService extends MediaBrowserServiceCompat implements
     }
 
 
+    //-------------------------------------Lifecycle methods--------------------------------------//
+
+    @Override
+    public void onCreate() {
+        super.onCreate();
+
+        Log.d("service onCreate: ", "Service created");
+        registerAudioLoadCompleteReceiver();
+        initMediaPlayer();
+        initMediaSession();
+        callStateListener();
+
+        gesNotificationManager = (NotificationManager) getSystemService(Context.NOTIFICATION_SERVICE);
+
+        // Set an initial PlaybackState with ACTION_PLAY, so media buttons can start the player
+        // Very much needed to avoid lots of NullPtrExceptions with getPlaybackState()
+        PlaybackStateCompat.Builder playbackStateBuilder = new PlaybackStateCompat.Builder()
+                .setActions(PlaybackStateCompat.ACTION_PLAY |
+                            PlaybackStateCompat.ACTION_PLAY_PAUSE);
+        gesMediaSession.setPlaybackState(playbackStateBuilder.build()); //translates to STATE_NONE
+
+        //create a notification channel for displaying notifications on API 26+
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            // Create the NotificationChannel
+            String name = "GES Notification Channel";
+            String description = "This is the GES Media Player notification channel - test";
+            int importance = NotificationManager.IMPORTANCE_DEFAULT;
+            long vibrationP[] = {0}; //to eliminate vibration for every command on notification
+
+            NotificationChannel mChannel = new NotificationChannel(CHANNEL_ID, name, importance);
+            mChannel.setDescription(description);
+            mChannel.setVibrationPattern(vibrationP);
+            // Register the channel with the system; you can't change the importance
+            // or other notification behaviors after this
+            gesNotificationManager.createNotificationChannel(mChannel);
+        }
+        Log.d("service onCreate: ", "exited service onCreate");
+    }
+    @Override
+    public int onStartCommand(Intent intent, int flags, int startId) {
+        Log.d("onStartCommand: ", "Service has been started");
+        isServiceStarted = true;
+        registerNotificationCommandReceiver();
+
+        PlaybackStateCompat pbState = gesMediaSession.getController().getPlaybackState();
+        Log.d("onPlay: ", "current playback state is: " + pbState.getState());
+
+        MediaButtonReceiver.handleIntent(gesMediaSession, intent);
+        Log.d("onStartCommand: ", "exited onStartCommand method");
+        return super.onStartCommand(intent, flags, startId);
+    }
+    @Override
+    public void onDestroy() {
+        super.onDestroy();
+        Log.d("service onDestroy: ", "onDestroy just entered");
+
+        //Disable the PhoneStateListener
+        if (phoneStateListener != null) {
+            telephonyManager.listen(phoneStateListener, PhoneStateListener.LISTEN_NONE);
+        }
+
+        /*//clear cached playlist
+        //new StorageUtils(getApplicationContext()).clearCachedAudioPlaylist();*/
+
+        gesMediaSession.release();
+        unregisterReceiver(audioLoadComplete);
+
+        /*handle app crash when it is started but no music is played, as
+        * the broadcast receiver is never being registered, giving error
+        * when entering onDestroy with an unregistered receiver*/
+        if(isServiceStarted){
+            unregisterReceiver(notificationPlaybackCommand);
+        }
+        Log.d("service onDestroy: ", "everything unregistered and cleared in service, exiting...");
+    }
+
+
+    //---------------------------------Media Player Listeners-------------------------------------//
+    @Override
+    public void onPrepared(MediaPlayer mp){
+        Log.d("onPrepared: ", "Media Player is ready for playback");
+        gesMediaSession.setActive(true);
+        gesMediaPlayer.start();
+        setMediaPlaybackState(PlaybackStateCompat.STATE_PLAYING);
+        //createNotification();
+        gesNotification = createNotification();
+        startForeground(NOTIFICATION_ID, gesNotification);
+        registerNoisyReceiver();
+    }
+    @Override
+    public void onCompletion(MediaPlayer mediaPlayer) {
+        if( gesMediaPlayer != null ) {
+            //gesMediaPlayer.reset();
+            transportControls.skipToNext();
+            //should not reset in here because it breaks controls of the
+            //notification as the song changes, should only skip to next
+        }
+    }
+    @Override
+    public boolean onError(MediaPlayer mp, int what, int extra) {
+        //Invoked when there has been an error for an asynchronous operation.
+        switch (what) {
+            case MediaPlayer.MEDIA_ERROR_NOT_VALID_FOR_PROGRESSIVE_PLAYBACK:
+                Log.d("MediaPlayer Error",
+                        "MEDIA ERROR NOT VALID FOR PROGRESSIVE PLAYBACK " + extra);
+                break;
+            case MediaPlayer.MEDIA_ERROR_SERVER_DIED:
+                Log.d("MediaPlayer Error",
+                        "MEDIA ERROR SERVER DIED " + extra);
+                break;
+            case MediaPlayer.MEDIA_ERROR_UNKNOWN:
+                Log.d("MediaPlayer Error",
+                        "MEDIA ERROR UNKNOWN " + extra);
+                break;
+            case MediaPlayer.MEDIA_ERROR_UNSUPPORTED:
+                Log.d("MediaPlayer Error",
+                        "MEDIA ERROR UNSUPPORTED " + extra);
+                break;
+        }
+        return false;
+        //TODO: documentation talks about mediaPlayer needing reset here before
+        //being able to use it again
+    }
+
+
+
+
     //-----------------------------------Media Playback functions---------------------------------//
 
     //TODO: read about the AssetFileDescriptor, and the ResultReceiver for onPlayFromMediaId
-
     private MediaSessionCompat.Callback mediaSessionCallbacks = new MediaSessionCompat.Callback() {
         @Override
         public void onPlay() {
@@ -303,13 +305,38 @@ public class MediaPlaybackService extends MediaBrowserServiceCompat implements
                 startService(new Intent(getApplicationContext(), MediaPlaybackService.class));
             }
 
+            if(activeAudio == null){
+                audioIndex = 0;
+                activeAudio = audioList.get(audioIndex);
+
+                try {
+                    //sets current song as data source for media player
+                    gesMediaPlayer.setDataSource(activeAudio.getData());
+                    gesMediaPlayer.prepareAsync();
+                } catch (IOException e) {
+                    e.printStackTrace();
+                    Log.e("MUSIC SERVICE", "Error setting data source", e);
+                    stopSelf();
+                }
+            }
+
             if(gesMediaSession.getController().getPlaybackState().getState() == PlaybackStateCompat.STATE_PAUSED){
                 gesMediaSession.setActive(true);
                 gesMediaPlayer.start();
                 setMediaPlaybackState(PlaybackStateCompat.STATE_PLAYING);
                 registerNoisyReceiver();
-                createNotification();
+                gesNotification = createNotification();
+                startForeground(NOTIFICATION_ID, gesNotification);
             }
+
+            /*if(gesMediaSession.getController().getPlaybackState().getState() == PlaybackStateCompat.STATE_PAUSED){
+                gesMediaSession.setActive(true);
+                gesMediaPlayer.start();
+                setMediaPlaybackState(PlaybackStateCompat.STATE_PLAYING);
+                registerNoisyReceiver();
+                //createNotification();
+                startForeground(NOTIFICATION_ID, gesNotification);
+            }*/
         }
         @Override
         public void onPause() {
@@ -318,8 +345,12 @@ public class MediaPlaybackService extends MediaBrowserServiceCompat implements
             if( gesMediaPlayer.isPlaying() ) {
                 gesMediaPlayer.pause();
                 unregisterReceiver(becomingNoisyReceiver);
+                //createNotification();
+                stopForeground(false);
                 setMediaPlaybackState(PlaybackStateCompat.STATE_PAUSED);
-                createNotification();
+                gesNotification = createNotification();
+                //NotificationManager notificationManager = (NotificationManager) getSystemService(Context.NOTIFICATION_SERVICE);
+                gesNotificationManager.notify(NOTIFICATION_ID, gesNotification);
             }
         }
         @Override
@@ -396,10 +427,11 @@ public class MediaPlaybackService extends MediaBrowserServiceCompat implements
             am.abandonAudioFocus(MediaPlaybackService.this);
 
             stopSelf();
-            // Set the session inactive  (and update metadata and state)
+            isServiceStarted = false;
             gesMediaSession.setActive(false);
             gesMediaPlayer.stop();
-            removeNotification();
+            stopForeground(true);
+            //removeNotification();
         }
         @Override
         public void onPlayFromMediaId(String mediaId, Bundle extras) {
@@ -449,20 +481,6 @@ public class MediaPlaybackService extends MediaBrowserServiceCompat implements
         }
     };
 
-    private void setMediaPlaybackState(int state) {
-        PlaybackStateCompat.Builder playbackstateBuilder = new PlaybackStateCompat.Builder();
-        if( state == PlaybackStateCompat.STATE_PLAYING ) {
-            playbackstateBuilder.setActions(PlaybackStateCompat.ACTION_PLAY_PAUSE |
-                                            PlaybackStateCompat.ACTION_PAUSE);
-        } else {
-            playbackstateBuilder.setActions(PlaybackStateCompat.ACTION_PLAY_PAUSE |
-                                            PlaybackStateCompat.ACTION_PLAY);
-        }
-        playbackstateBuilder.setState(state, PlaybackStateCompat.PLAYBACK_POSITION_UNKNOWN, 0);
-        gesMediaSession.setPlaybackState(playbackstateBuilder.build());
-    }
-
-
 
     //------------------------------AudioFocus, Calls and Broadcasts-------------------------------//
 
@@ -471,6 +489,56 @@ public class MediaPlaybackService extends MediaBrowserServiceCompat implements
     private PhoneStateListener phoneStateListener;
     private TelephonyManager telephonyManager;
 
+    @Override
+    public void onAudioFocusChange(int focusChange) {
+        switch( focusChange ) {
+            case AudioManager.AUDIOFOCUS_LOSS: {
+                // Lost focus for an unbounded amount of time:
+                // stop playback and (maybe) release media player
+                if( gesMediaPlayer.isPlaying() ) {
+                    gesMediaPlayer.pause();
+                    setMediaPlaybackState(PlaybackStateCompat.STATE_PAUSED);
+                    gesNotification = createNotification();
+                    gesNotificationManager.notify(NOTIFICATION_ID, gesNotification);
+                    //gesMediaPlayer.stop();
+                    //transportControls.stop();
+                }
+                break;
+            }
+            case AudioManager.AUDIOFOCUS_LOSS_TRANSIENT: {
+                // Lost focus for a short time; Pause only and do not
+                // release the media player as playback is likely to resume
+                if (gesMediaPlayer.isPlaying()) {
+                    gesMediaPlayer.pause();
+                    setMediaPlaybackState(PlaybackStateCompat.STATE_PAUSED);
+                    gesNotification = createNotification();
+                    gesNotificationManager.notify(NOTIFICATION_ID, gesNotification);
+                }
+                break;
+            }
+            case AudioManager.AUDIOFOCUS_LOSS_TRANSIENT_CAN_DUCK: {
+                // Lost focus for a short time (ex. notification sound)
+                // but it's ok to keep playing at a temporarily attenuated level
+                if( gesMediaPlayer != null ) {
+                    gesMediaPlayer.setVolume(0.2f, 0.2f);
+                }
+                break;
+            }
+            case AudioManager.AUDIOFOCUS_GAIN: {
+                //Invoked when the audio focus of the system is updated.
+                if( gesMediaPlayer != null ) {
+                    if( !gesMediaPlayer.isPlaying() ) {
+                        gesMediaPlayer.start();
+                        setMediaPlaybackState(PlaybackStateCompat.STATE_PLAYING);
+                        gesNotification = createNotification();
+                        gesNotificationManager.notify(NOTIFICATION_ID, gesNotification);
+                    }
+                    gesMediaPlayer.setVolume(1.0f, 1.0f);
+                }
+                break;
+            }
+        }
+    }
     private boolean requestAudioFocus() {
         AudioManager audioManager = (AudioManager) getSystemService(Context.AUDIO_SERVICE);
         int result = audioManager.requestAudioFocus(this,
@@ -516,53 +584,6 @@ public class MediaPlaybackService extends MediaBrowserServiceCompat implements
         telephonyManager.listen(phoneStateListener,
                 PhoneStateListener.LISTEN_CALL_STATE);
     }
-    @Override
-    public void onAudioFocusChange(int focusChange) {
-        switch( focusChange ) {
-            case AudioManager.AUDIOFOCUS_LOSS: {
-                // Lost focus for an unbounded amount of time:
-                // stop playback and (maybe) release media player
-                if( gesMediaPlayer.isPlaying() ) {
-                    gesMediaPlayer.pause();
-                    setMediaPlaybackState(PlaybackStateCompat.STATE_PAUSED);
-                    createNotification();
-                    //gesMediaPlayer.stop();
-                    //transportControls.stop();
-                }
-                break;
-            }
-            case AudioManager.AUDIOFOCUS_LOSS_TRANSIENT: {
-                // Lost focus for a short time; Pause only and do not
-                // release the media player as playback is likely to resume
-                if (gesMediaPlayer.isPlaying()) {
-                    gesMediaPlayer.pause();
-                    setMediaPlaybackState(PlaybackStateCompat.STATE_PAUSED);
-                    createNotification();
-                }
-                break;
-            }
-            case AudioManager.AUDIOFOCUS_LOSS_TRANSIENT_CAN_DUCK: {
-                // Lost focus for a short time (ex. notification sound)
-                // but it's ok to keep playing at a temporarily attenuated level
-                if( gesMediaPlayer != null ) {
-                    gesMediaPlayer.setVolume(0.2f, 0.2f);
-                }
-                break;
-            }
-            case AudioManager.AUDIOFOCUS_GAIN: {
-                //Invoked when the audio focus of the system is updated.
-                if( gesMediaPlayer != null ) {
-                    if( !gesMediaPlayer.isPlaying() ) {
-                        gesMediaPlayer.start();
-                        setMediaPlaybackState(PlaybackStateCompat.STATE_PLAYING);
-                        createNotification();
-                    }
-                    gesMediaPlayer.setVolume(1.0f, 1.0f);
-                }
-                break;
-            }
-        }
-    }
 
     private BroadcastReceiver becomingNoisyReceiver = new BroadcastReceiver() {
         @Override
@@ -570,6 +591,8 @@ public class MediaPlaybackService extends MediaBrowserServiceCompat implements
             if( gesMediaPlayer != null && gesMediaPlayer.isPlaying() ) {
                 gesMediaPlayer.pause();
                 setMediaPlaybackState(PlaybackStateCompat.STATE_PAUSED);
+                gesNotification = createNotification();
+                gesNotificationManager.notify(NOTIFICATION_ID, gesNotification);
             }
         }
     };
@@ -617,7 +640,7 @@ public class MediaPlaybackService extends MediaBrowserServiceCompat implements
 
     //--------------------------------------------------------------------------------------------//
 
-    private void createNotification(){
+    private Notification createNotification(){
         //Playback actions for the notification buttons
         Intent playPauseSongIntent = new Intent();
         Intent previousSongIntent = new Intent(ACTION_PREVIOUS);
@@ -667,7 +690,7 @@ public class MediaPlaybackService extends MediaBrowserServiceCompat implements
         Intent notificationClickIntent = new Intent(this, MainActivity.class);
         notificationClickIntent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TASK);
         PendingIntent clickActivityStart = PendingIntent.getActivity(this, 0,
-                                            notificationClickIntent , PendingIntent.FLAG_UPDATE_CURRENT);
+                                            notificationClickIntent, PendingIntent.FLAG_UPDATE_CURRENT);
 
         NotificationCompat.Builder notificationBuilder = (NotificationCompat.Builder)
                 new NotificationCompat.Builder(this, CHANNEL_ID);
@@ -715,8 +738,9 @@ public class MediaPlaybackService extends MediaBrowserServiceCompat implements
                         nextSongPendingIntent);
 
         //.build();
-        ((NotificationManager) getSystemService(Context.NOTIFICATION_SERVICE))
-                .notify(NOTIFICATION_ID, notificationBuilder.build());
+        /*((NotificationManager) getSystemService(Context.NOTIFICATION_SERVICE))
+                .notify(NOTIFICATION_ID, notificationBuilder.build());*/
+        return notificationBuilder.build();
     }
     private void removeNotification() {
         NotificationManager notificationManager = (NotificationManager) getSystemService(Context.NOTIFICATION_SERVICE);
