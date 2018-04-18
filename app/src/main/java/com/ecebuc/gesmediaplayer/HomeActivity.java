@@ -1,7 +1,9 @@
 package com.ecebuc.gesmediaplayer;
 
+import android.os.AsyncTask;
 import android.os.Bundle;
 import android.support.design.widget.NavigationView;
+import android.support.v4.app.FragmentManager;
 import android.support.v4.app.FragmentTransaction;
 import android.support.v4.view.GravityCompat;
 import android.support.v4.widget.DrawerLayout;
@@ -13,9 +15,12 @@ import android.util.Log;
 import android.view.Menu;
 import android.view.MenuItem;
 
+import com.ecebuc.gesmediaplayer.Audios.Audio;
 import com.ecebuc.gesmediaplayer.Fragments.AlbumsFragment;
 import com.ecebuc.gesmediaplayer.Fragments.ArtistsFragment;
 import com.ecebuc.gesmediaplayer.Fragments.SongsFragment;
+
+import java.util.ArrayList;
 
 public class HomeActivity extends AppCompatActivity
         implements NavigationView.OnNavigationItemSelectedListener,
@@ -42,15 +47,8 @@ public class HomeActivity extends AppCompatActivity
 
             Bundle args = new Bundle();
 
-            // Create a new Fragment to be placed in the activity layout
             SongsFragment firstFragment = new SongsFragment();
             firstFragment.setArguments(args);
-
-            // In case this activity was started with special instructions from an
-            // Intent, pass the Intent's extras to the fragment as arguments
-            //firstFragment.setArguments(getIntent().getExtras());
-
-            // Add the fragment to the 'fragment_container' FrameLayout
             getSupportFragmentManager().beginTransaction()
                     .add(R.id.home_fragment_container, firstFragment).commit();
         }
@@ -132,6 +130,7 @@ public class HomeActivity extends AppCompatActivity
                 //fragmentArgs.putBoolean(IS_FRAGMENT_TYPE_DEFAULT_TAG, true);
                 songsFragment.setArguments(fragmentArgs);
 
+                getSupportFragmentManager().popBackStackImmediate(null, FragmentManager.POP_BACK_STACK_INCLUSIVE);
                 fragmentTransaction = getSupportFragmentManager().beginTransaction();
                 fragmentTransaction.replace(R.id.home_fragment_container, songsFragment);
                 //fragmentTransaction.addToBackStack(null);
@@ -143,6 +142,8 @@ public class HomeActivity extends AppCompatActivity
                 //fragmentArgs.putBoolean(IS_FRAGMENT_TYPE_DEFAULT_TAG, true);
                 artistsFragment.setArguments(fragmentArgs);
 
+                //clear back stack and start fresh
+                getSupportFragmentManager().popBackStackImmediate(null, FragmentManager.POP_BACK_STACK_INCLUSIVE);
                 fragmentTransaction = getSupportFragmentManager().beginTransaction();
                 fragmentTransaction.replace(R.id.home_fragment_container, artistsFragment);
                 //fragmentTransaction.addToBackStack(null);
@@ -153,6 +154,7 @@ public class HomeActivity extends AppCompatActivity
                 //fragmentArgs.putBoolean(IS_FRAGMENT_TYPE_DEFAULT_TAG, true);
                 albumsFragment.setArguments(fragmentArgs);
 
+                getSupportFragmentManager().popBackStackImmediate(null, FragmentManager.POP_BACK_STACK_INCLUSIVE);
                 fragmentTransaction = getSupportFragmentManager().beginTransaction();
                 fragmentTransaction.replace(R.id.home_fragment_container, albumsFragment);
                 //fragmentTransaction.addToBackStack(null);
@@ -176,7 +178,7 @@ public class HomeActivity extends AppCompatActivity
             getSupportActionBar().setTitle(fragmentTitle);
         } catch (Exception e){
             e.printStackTrace();
-            Log.d("updateToolbarSong: ", "setTitle: " + e);
+            Log.d("updateToolbarTitle: ", "setTitle: " + e);
         }
     }
     @Override

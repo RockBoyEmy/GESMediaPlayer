@@ -4,6 +4,7 @@ import android.content.ContentResolver;
 import android.content.Context;
 import android.database.Cursor;
 import android.net.Uri;
+import android.os.AsyncTask;
 import android.os.Bundle;
 import android.provider.MediaStore;
 import android.support.annotation.Nullable;
@@ -18,7 +19,6 @@ import android.view.ViewGroup;
 import android.widget.Toast;
 
 import com.ecebuc.gesmediaplayer.AudioUtils.SongAdapter;
-import com.ecebuc.gesmediaplayer.AudioUtils.StorageUtils;
 import com.ecebuc.gesmediaplayer.Audios.Audio;
 import com.ecebuc.gesmediaplayer.R;
 import com.ecebuc.gesmediaplayer.Utils.SimpleDividerItemDecoration;
@@ -34,12 +34,14 @@ public class SongsFragment extends Fragment {
     private RecyclerView.Adapter songRecyclerAdapter;
     private RecyclerView.LayoutManager recyclerLayoutManager;
     private ArrayList<Audio> songList = new ArrayList<>();
+    private SongLoaderAsync songLoader;
 
     private final String IS_FRAGMENT_TYPE_DEFAULT_TAG = "isFragmentDefaultTag";
+    private String fragmentTitle;
+
     private final String fromAlbumIDParamTAG = "Album ID";
     private boolean paramIsFragmentDefault;
     private String paramAlbumID;
-    private String fragmentTitle;
 
     public SongsFragment() {
         // Required empty public constructor
@@ -71,18 +73,13 @@ public class SongsFragment extends Fragment {
         paramIsFragmentDefault = args.getBoolean(IS_FRAGMENT_TYPE_DEFAULT_TAG, true);
 
         if(paramIsFragmentDefault){
-            //default behavior - display all albums
-            //get the songs list for the recyclerview adapter
-            StorageUtils storageUtils = new StorageUtils(getActivity());
-            songList = storageUtils.loadAudio();
-            //initSongList();
+            //default behavior - display all device songs
+            //will be done in onCreateView
             fragmentTitle = "All Songs";
         } else {
-            //fragment was created with arguments - handle accordingly
+            //fragment was probably created from an album - handle accordingly
             paramAlbumID = args.getString(fromAlbumIDParamTAG);
-            if(paramAlbumID != null){
-                initSongListFromId(paramAlbumID);
-            } else {
+            if(paramAlbumID == null){
                 Log.e("SongsFrag onCreate: ", "error - paramAlbumID is null");
             }
         }
@@ -102,20 +99,31 @@ public class SongsFragment extends Fragment {
 
         songRecyclerAdapter = new SongAdapter(songList);
         songRecyclerView.setAdapter(songRecyclerAdapter);
+
+        //here goes the AsyncTask
+        if(paramIsFragmentDefault){
+            //fragment is new, load all songs asynchronously
+            songLoader = new SongLoaderAsync(songRecyclerView.getAdapter());
+            initSongAsyncTask(songLoader);
+        }
+        else {
+            //songList has songs in it, means fragment comes from an album
+            initSongListFromId(paramAlbumID);
+        }
+
         songRecyclerView.setItemAnimator(new DefaultItemAnimator());
-        songRecyclerView.addOnItemTouchListener(
-                new RecyclerTouchListener(getContext(), songRecyclerView, new RecyclerTouchListener.ClickListener() {
+        songRecyclerView.addOnItemTouchListener(new RecyclerTouchListener(getContext(), songRecyclerView, new RecyclerTouchListener.ClickListener() {
             @Override
             public void onClick(View view, int position) {
                 Audio selectedSong = songList.get(position);
                 Toast.makeText(getContext(), selectedSong.getTitle() + " is selected!", Toast.LENGTH_SHORT).show();
             }
-
             @Override
             public void onLongClick(View view, int position) {
                 Toast.makeText(getContext(), "Long selected", Toast.LENGTH_SHORT).show();
             }
         }));
+
 
         return rootView;
     }
@@ -123,6 +131,14 @@ public class SongsFragment extends Fragment {
     public void onActivityCreated(@Nullable Bundle savedInstanceState) {
         super.onActivityCreated(savedInstanceState);
         songFragmentCallback.updateToolbarTitleForFragment(fragmentTitle);
+    }
+    @Override
+    public void onDestroy(){
+        super.onDestroy();
+
+        if(songLoader != null && !songLoader.isCancelled()){
+            songLoader.cancel(true);
+        }
     }
     @Override
     public void onDetach() {
@@ -141,9 +157,9 @@ public class SongsFragment extends Fragment {
         Uri uri = MediaStore.Audio.Media.EXTERNAL_CONTENT_URI;
         String selection = MediaStore.Audio.Media.IS_MUSIC + "!= 0";
         selection += " and album_id = " + id;
-        String sortOrder = MediaStore.Audio.AudioColumns.TITLE + " COLLATE LOCALIZED ASC";
+        String sortOrder = MediaStore.Audio.AudioColumns.TRACK + " ASC";
 
-        String[] ALBUM_SUMMARY_PROJECTION = {
+        String[] SONG_SUMMARY_PROJECTION = {
                 MediaStore.Audio.Media.TITLE,
                 MediaStore.Audio.Media.ARTIST,
                 MediaStore.Audio.Media.DATA,
@@ -152,7 +168,7 @@ public class SongsFragment extends Fragment {
         };
 
         Cursor cursor = contentResolver.query(uri,
-                            ALBUM_SUMMARY_PROJECTION,
+                            SONG_SUMMARY_PROJECTION,
                             selection, null,
                             sortOrder);
 
@@ -174,11 +190,88 @@ public class SongsFragment extends Fragment {
 
                 // Save to audioList
                 songList.add(new Audio(data, title, album, artist, albumArt));
+                songRecyclerView.getAdapter().notifyItemInserted(cursor.getPosition());
             }
             //set the fragment name to the artist of which we are displaying the albums
             cursor.moveToPrevious();
             fragmentTitle = cursor.getString(cursor.getColumnIndex(MediaStore.Audio.Media.ALBUM));
         }
         cursor.close();
+    }
+    private void initSongAsyncTask(SongLoaderAsync songLoader){
+        ContentResolver contentResolver = getActivity().getContentResolver();
+        final String[] SONG_SUMMARY_PROJECTION = {
+                MediaStore.Audio.Media.TITLE,
+                MediaStore.Audio.Media.ARTIST,
+                MediaStore.Audio.Media.DATA,
+                MediaStore.Audio.Media.ALBUM,
+                MediaStore.Audio.Media.ALBUM_ID
+        };
+
+        Uri songUri = MediaStore.Audio.Media.EXTERNAL_CONTENT_URI;
+        String selection = MediaStore.Audio.Media.IS_MUSIC + "!= 0";
+        String sortOrder = MediaStore.Audio.Media.TITLE + " ASC";
+        final Cursor cursor = contentResolver.query(
+                songUri,
+                SONG_SUMMARY_PROJECTION,
+                selection, null,
+                sortOrder);
+
+        //begin song load asynchronously
+        songLoader.execute(cursor);
+    }
+
+    private class SongLoaderAsync extends AsyncTask<Cursor, Audio, Void> {
+        RecyclerView.Adapter recyclerAdapter;
+        ContentResolver contentResolver;
+        String data, title, album, artist, albumArt, albumId;
+        int position;
+
+        public SongLoaderAsync(RecyclerView.Adapter adapter) {
+            recyclerAdapter = adapter;
+            contentResolver = getActivity().getContentResolver();
+            position = -1;
+        }
+
+        @Override
+        protected Void doInBackground(Cursor... passedCursor) {
+
+            if (passedCursor[0] != null && passedCursor[0].getCount() > 0) {
+                while (passedCursor[0].moveToNext()) {
+                    albumId = passedCursor[0].getString(passedCursor[0].getColumnIndex(MediaStore.Audio.Media.ALBUM_ID));
+                    data = passedCursor[0].getString(passedCursor[0].getColumnIndex(MediaStore.Audio.Media.DATA));
+                    title = passedCursor[0].getString(passedCursor[0].getColumnIndex(MediaStore.Audio.Media.TITLE));
+                    album = passedCursor[0].getString(passedCursor[0].getColumnIndex(MediaStore.Audio.Media.ALBUM));
+                    artist = passedCursor[0].getString(passedCursor[0].getColumnIndex(MediaStore.Audio.Media.ARTIST));
+
+                    Cursor albumArtCursor = contentResolver.query(MediaStore.Audio.Albums.EXTERNAL_CONTENT_URI,
+                            new String[]{MediaStore.Audio.Albums._ID, MediaStore.Audio.Albums.ALBUM_ART},
+                            MediaStore.Audio.Albums._ID + "=?",
+                            new String[]{String.valueOf(albumId)},
+                            null);
+                    albumArtCursor.moveToFirst();
+                    albumArt = albumArtCursor.getString(albumArtCursor.getColumnIndex(MediaStore.Audio.Albums.ALBUM_ART));
+
+                    position++;
+                    publishProgress(new Audio(data, title, album, artist, albumArt));
+
+                    //periodically check if a cancel command was given, to exit rapidly
+                    if(isCancelled())break;
+                }
+            }
+            passedCursor[0].close();
+            return null;
+        }
+        @Override
+        protected void onProgressUpdate(Audio... newSong) {
+            //super.onProgressUpdate(newSong);
+            songList.add(newSong[0]);
+            recyclerAdapter.notifyItemInserted(position);
+
+        }
+        @Override
+        protected void onPostExecute(Void aVoid) {
+            //super.onPostExecute(aVoid);
+        }
     }
 }

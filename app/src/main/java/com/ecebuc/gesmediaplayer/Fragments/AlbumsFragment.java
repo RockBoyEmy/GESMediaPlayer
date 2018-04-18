@@ -4,6 +4,7 @@ import android.content.ContentResolver;
 import android.content.Context;
 import android.database.Cursor;
 import android.net.Uri;
+import android.os.AsyncTask;
 import android.os.Bundle;
 import android.os.Handler;
 import android.provider.MediaStore;
@@ -32,12 +33,14 @@ public class AlbumsFragment extends Fragment {
     private RecyclerView.Adapter albumRecyclerAdapter;
     private RecyclerView.LayoutManager recyclerLayoutManager;
     private ArrayList<Album> albumList = new ArrayList<>();
+    private AlbumLoaderAsync albumLoader;
 
     private final String IS_FRAGMENT_TYPE_DEFAULT_TAG = "isFragmentDefaultTag";
+    private String fragmentTitle;
+
     private final String fromArtistIDParamTAG = "Artist ID";
     private boolean paramIsFragmentDefault;
     private String paramArtistID;
-    private String fragmentTitle;
 
     public AlbumsFragment() {
         // Required empty public constructor
@@ -66,19 +69,15 @@ public class AlbumsFragment extends Fragment {
 
         if(paramIsFragmentDefault){
             //default behavior - display all albums
-            initAlbumList();
+            //will be done in onCreateView
             fragmentTitle = "Albums";
         } else {
             //fragment was created with arguments - handle accordingly
             paramArtistID = args.getString(fromArtistIDParamTAG);
-            if(paramArtistID != null){
-                initAlbumListFromId(paramArtistID);
-            } else {
+            if(paramArtistID == null){
                 Log.e("AlbumFrag onCreate: ", "error - paramArtistID is null");
             }
         }
-        //populating the list with the albums on device
-        //albumList = initAlbumList();
     }
     @Override
     public View onCreateView(LayoutInflater inflater, ViewGroup container, Bundle savedInstanceState) {
@@ -93,9 +92,20 @@ public class AlbumsFragment extends Fragment {
 
         albumRecyclerAdapter = new AlbumAdapter(albumList);
         albumRecyclerView.setAdapter(albumRecyclerAdapter);
+
+        //here goes the AsyncTask
+        if(paramIsFragmentDefault){
+            //fragment is new, load all albums asynchronously
+            albumLoader = new AlbumLoaderAsync(albumRecyclerView.getAdapter());
+            initAlbumAsyncTask(albumLoader);
+        }
+        else{
+            //albumList has albums in it, means fragment comes from an artist
+            initAlbumListFromId(paramArtistID);
+        }
+
         albumRecyclerView.setItemAnimator(new DefaultItemAnimator());
-        albumRecyclerView.addOnItemTouchListener(
-                new RecyclerTouchListener(getContext(), albumRecyclerView, new RecyclerTouchListener.ClickListener() {
+        albumRecyclerView.addOnItemTouchListener(new RecyclerTouchListener(getContext(), albumRecyclerView, new RecyclerTouchListener.ClickListener() {
                     @Override
                     public void onClick(View view, int position) {
                         Album selectedAlbum = albumList.get(position);
@@ -119,6 +129,14 @@ public class AlbumsFragment extends Fragment {
         albumFragmentCallback.updateToolbarTitleForFragment(fragmentTitle);
     }
     @Override
+    public void onDestroy(){
+        super.onDestroy();
+
+        if(albumLoader != null && !albumLoader.isCancelled()){
+            albumLoader.cancel(true);
+        }
+    }
+    @Override
     public void onDetach() {
         super.onDetach();
         albumFragmentCallback = null;
@@ -129,84 +147,21 @@ public class AlbumsFragment extends Fragment {
         void startSongsFragmentFromId(String albumId);
     }
 
-    private void /*ArrayList<Album>*/ initAlbumList() {
-        //this function populates the global albumList directly through the parallel thread
-        ContentResolver contentResolver = getActivity().getContentResolver();
-        Handler albumLoadHandler;
-        Runnable albumLoadRunnable;
-        final int TIMES_TO_NEXT_ADAPTER_NOTIFY = 5;
-        //ArrayList<Album> albumList = new ArrayList<>();
-
-        final String[] ALBUM_SUMMARY_PROJECTION = {
-                MediaStore.Audio.Albums._ID,
-                MediaStore.Audio.Albums.ALBUM,
-                MediaStore.Audio.Albums.ARTIST,
-                MediaStore.Audio.Albums.ALBUM_ART};
-
-        Uri albumUri = MediaStore.Audio.Albums.EXTERNAL_CONTENT_URI;
-        String sortOrder = MediaStore.Audio.Albums.ALBUM + " ASC";
-        final Cursor cursor = contentResolver.query(
-                albumUri,
-                ALBUM_SUMMARY_PROJECTION,
-                null, null,
-                sortOrder);
-
-        Log.d("initAlbumList: ", "Album query performed");
-
-        albumLoadHandler = new Handler();
-        albumLoadRunnable = new Runnable() {
-            @Override
-            public void run() {
-                String albumId, albumTitle, albumArtist, albumArt;
-                Cursor runnableCursor = cursor;
-                int notifyCounter = TIMES_TO_NEXT_ADAPTER_NOTIFY;
-
-                if (runnableCursor != null && runnableCursor.getCount() > 0) {
-                    while (runnableCursor.moveToNext()) {
-                        albumId = runnableCursor.getString(runnableCursor.getColumnIndex(MediaStore.Audio.Albums._ID));
-                        albumTitle = runnableCursor.getString(runnableCursor.getColumnIndex(MediaStore.Audio.Albums.ALBUM));
-                        albumArtist = runnableCursor.getString(runnableCursor.getColumnIndex(MediaStore.Audio.Albums.ARTIST));
-                        albumArt = runnableCursor.getString(runnableCursor.getColumnIndex(MediaStore.Audio.Albums.ALBUM_ART));
-
-                        // Save to albumList
-                        albumList.add(new Album(albumId, albumTitle, albumArtist, albumArt));
-                        Log.d("initAlbumLoad: ", "added " + albumTitle + " to the list");
-                        Log.d("initAlbumLoad: ", "notifyCounter is: " + notifyCounter);
-                        notifyCounter--;
-
-                        //if dataset was updated the set amount of times, notify adapter
-                        if (notifyCounter == 0) {
-                            albumRecyclerAdapter.notifyDataSetChanged();
-                            Log.d("initAlbumLoad: ", "adapter notified");
-                            notifyCounter = 5;
-                        }
-                    }
-
-                    //when all device files have been loaded, notify adapter one last time
-                    albumRecyclerAdapter.notifyDataSetChanged();
-                    Log.d("initAlbumLoad: ", "adapter notified the last time");
-                }
-                runnableCursor.close();
-                if (albumList.isEmpty()) {
-                    Toast.makeText(getActivity(), "There are no albums on device", Toast.LENGTH_SHORT).show();
-                }
-            }
-        };
-        albumLoadHandler.post(albumLoadRunnable);
-    }
     private void initAlbumListFromId(String id){
         ContentResolver contentResolver = getActivity().getContentResolver();
         String albumId, albumTitle, albumArtist, albumArt;
         long artistId = Long.parseLong(id);
 
+        Uri albumUri = MediaStore.Audio.Artists.Albums.getContentUri("external", artistId);
+        String sortOrder = MediaStore.Audio.Albums.ALBUM + " ASC";
+
         final String[] ALBUM_SUMMARY_PROJECTION = {
                 MediaStore.Audio.Albums._ID,
                 MediaStore.Audio.Albums.ALBUM,
                 MediaStore.Audio.Albums.ARTIST,
                 MediaStore.Audio.Albums.ALBUM_ART};
 
-        Uri albumUri = MediaStore.Audio.Artists.Albums.getContentUri("external", artistId);
-        String sortOrder = MediaStore.Audio.Albums.ALBUM + " ASC";
+
         final Cursor cursor = contentResolver.query(
                 albumUri,
                 ALBUM_SUMMARY_PROJECTION,
@@ -223,6 +178,7 @@ public class AlbumsFragment extends Fragment {
 
                 // Save to albumList
                 albumList.add(new Album(albumId, albumTitle, albumArtist, albumArt));
+                albumRecyclerView.getAdapter().notifyItemInserted(cursor.getPosition());
             }
             //set the fragment name to the artist of which we are displaying the albums
             cursor.moveToPrevious();
@@ -230,105 +186,67 @@ public class AlbumsFragment extends Fragment {
         }
         cursor.close();
     }
-}
-
-
-
-
-
-
-
-/*public class AlbumsFragment extends Fragment implements
-        LoaderManager.LoaderCallbacks<Cursor> {
-
-    private OnAlbumFragmentInteractionListener albumFragmentCallback;
-    private final static int LOADER_ID = 0;
-    private RecyclerView albumRecyclerView;
-    private AlbumAdapter albumRecyclerAdapter;
-    private RecyclerView.LayoutManager recyclerLayoutManager;
-
-
-    public AlbumsFragment() {
-    }
-    public static AlbumsFragment newInstance(String paramArtistID, String param2) {
-        AlbumsFragment fragment = new AlbumsFragment();
-        return fragment;
-    }
-
-    @Override
-    public void onAttach(Context context) {
-        super.onAttach(context);
-        if (context instanceof OnAlbumFragmentInteractionListener) {
-            mListener = (OnAlbumFragmentInteractionListener) context;
-        } else {
-            throw new RuntimeException(context.toString()
-                    + " must implement OnAlbumFragmentInteractionListener");
-        }
-    }
-    @Override
-    public void onCreate(Bundle savedInstanceState) {
-        super.onCreate(savedInstanceState);
-
-        //populating the list with the albums on device
-        //albumList = initAlbumList();
-    }
-    @Override
-    public View onCreateView(LayoutInflater inflater, ViewGroup container, Bundle savedInstanceState) {
-        // Inflate the layout for this fragment
-        View rootView = inflater.inflate(R.layout.fragment_albums, container, false);
-
-        //Recycler view setup for songs display
-        albumRecyclerView = (RecyclerView) rootView.findViewById(R.id.albums_recycler_view);
-        albumRecyclerView.setHasFixedSize(true);
-
-        recyclerLayoutManager = new GridLayoutManager(getActivity(), 2);
-        albumRecyclerView.setLayoutManager(recyclerLayoutManager);
-
-        albumRecyclerAdapter = new AlbumAdapter(getActivity(), null);
-        albumRecyclerView.setAdapter(albumRecyclerAdapter);
-        albumRecyclerView.setItemAnimator(new DefaultItemAnimator());
-
-        return rootView;
-    }
-    @Override
-    public void onActivityCreated(@Nullable Bundle savedInstanceState) {
-        super.onActivityCreated(savedInstanceState);
-        getLoaderManager().initLoader(LOADER_ID, null, this);
-    }
-
-    @Override
-    public Loader<Cursor> onCreateLoader(int id, Bundle args) {
+    private void initAlbumAsyncTask(AlbumLoaderAsync albumLoader){
+        ContentResolver contentResolver = getActivity().getContentResolver();
         final String[] ALBUM_SUMMARY_PROJECTION = {
                 MediaStore.Audio.Albums._ID,
                 MediaStore.Audio.Albums.ALBUM,
                 MediaStore.Audio.Albums.ARTIST,
-                MediaStore.Audio.Albums.ALBUM_ART };
+                MediaStore.Audio.Albums.ALBUM_ART};
+
         Uri albumUri = MediaStore.Audio.Albums.EXTERNAL_CONTENT_URI;
         String sortOrder = MediaStore.Audio.Albums.ALBUM + " ASC";
-
-        return new CursorLoader(getActivity(),
+        final Cursor cursor = contentResolver.query(
                 albumUri,
                 ALBUM_SUMMARY_PROJECTION,
                 null, null,
                 sortOrder);
-    }
-    @Override
-    public void onLoadFinished(Loader<Cursor> loader, Cursor data) {
-        //albumRecyclerAdapter.setData(data);
-        albumRecyclerAdapter.swapCursor(data);
-    }
-    @Override
-    public void onLoaderReset(Loader<Cursor> loader) {
-        //albumRecyclerAdapter.setData(null);
-        albumRecyclerAdapter.swapCursor(null);
+
+        //begin album load asynchronously
+        albumLoader.execute(cursor);
     }
 
-    public void onDetach() {
-        super.onDetach();
-        albumFragmentCallback = null;
-    }
+    private class AlbumLoaderAsync extends AsyncTask<Cursor, Album, Void> {
+        RecyclerView.Adapter recyclerAdapter;
+        ContentResolver contentResolver;
+        String albumId, albumTitle, albumArtist, albumArt;
+        int position;
 
-    public interface OnAlbumFragmentInteractionListener {
-        void updateToolbarTitleForFragment(String fragmentTitle);
+        public AlbumLoaderAsync(RecyclerView.Adapter adapter) {
+            recyclerAdapter = adapter;
+            contentResolver = getActivity().getContentResolver();
+            position = -1;
+        }
+
+        @Override
+        protected Void doInBackground(Cursor... passedCursor) {
+
+            if (passedCursor[0] != null && passedCursor[0].getCount() > 0) {
+                while (passedCursor[0].moveToNext()) {
+                    albumId = passedCursor[0].getString(passedCursor[0].getColumnIndex(MediaStore.Audio.Albums._ID));
+                    albumTitle = passedCursor[0].getString(passedCursor[0].getColumnIndex(MediaStore.Audio.Albums.ALBUM));
+                    albumArtist = passedCursor[0].getString(passedCursor[0].getColumnIndex(MediaStore.Audio.Albums.ARTIST));
+                    albumArt = passedCursor[0].getString(passedCursor[0].getColumnIndex(MediaStore.Audio.Albums.ALBUM_ART));
+
+                    position++;
+                    publishProgress(new Album(albumId, albumTitle, albumArtist, albumArt));
+
+                    //periodically check if a cancel command was given, to exit rapidly
+                    if(isCancelled())break;
+                }
+            }
+            passedCursor[0].close();
+            return null;
+        }
+        @Override
+        protected void onProgressUpdate(Album... newAlbum) {
+            //super.onProgressUpdate(values);
+            albumList.add(newAlbum[0]);
+            recyclerAdapter.notifyItemInserted(position);
+        }
+        @Override
+        protected void onPostExecute(Void aVoid) {
+            //super.onPostExecute(aVoid);
+        }
     }
-}*/
+}

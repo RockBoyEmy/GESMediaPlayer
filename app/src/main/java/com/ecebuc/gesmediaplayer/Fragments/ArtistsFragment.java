@@ -4,12 +4,15 @@ import android.content.ContentResolver;
 import android.content.Context;
 import android.database.Cursor;
 import android.net.Uri;
+import android.os.AsyncTask;
 import android.os.Bundle;
+import android.os.Handler;
 import android.provider.MediaStore;
 import android.support.v4.app.Fragment;
 import android.support.v7.widget.DefaultItemAnimator;
 import android.support.v7.widget.LinearLayoutManager;
 import android.support.v7.widget.RecyclerView;
+import android.util.Log;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
@@ -31,6 +34,7 @@ public class ArtistsFragment extends Fragment {
     private RecyclerView.Adapter artistRecyclerAdapter;
     private RecyclerView.LayoutManager recyclerLayoutManager;
     private ArrayList<Artist> artistList = new ArrayList<>();
+    private ArtistLoaderAsync artistLoader;
 
     public ArtistsFragment() {
         // Required empty public constructor
@@ -55,7 +59,7 @@ public class ArtistsFragment extends Fragment {
         super.onCreate(savedInstanceState);
 
         //populating the list with the artists on device
-        artistList = initArtistLoad();
+        //initArtistList();
     }
     @Override
     public View onCreateView(LayoutInflater inflater, ViewGroup container, Bundle savedInstanceState) {
@@ -71,6 +75,10 @@ public class ArtistsFragment extends Fragment {
 
         artistRecyclerAdapter = new ArtistAdapter(artistList);
         artistRecyclerView.setAdapter(artistRecyclerAdapter);
+
+        artistLoader = new ArtistLoaderAsync(artistRecyclerView.getAdapter());
+        initArtistAsyncTask(artistLoader);
+
         artistRecyclerView.setItemAnimator(new DefaultItemAnimator());
         artistRecyclerView.addOnItemTouchListener(
                 new RecyclerTouchListener(getContext(), artistRecyclerView, new RecyclerTouchListener.ClickListener() {
@@ -96,6 +104,14 @@ public class ArtistsFragment extends Fragment {
         artistFragmentCallback.updateToolbarTitleForFragment("Artists");
     }
     @Override
+    public void onDestroy() {
+        super.onDestroy();
+
+        if(artistLoader != null && !artistLoader.isCancelled()){
+            artistLoader.cancel(true);
+        }
+    }
+    @Override
     public void onDetach() {
         super.onDetach();
         artistFragmentCallback = null;
@@ -106,11 +122,9 @@ public class ArtistsFragment extends Fragment {
         void startAlbumsFragmentFromId(String artistId);
     }
 
-    private ArrayList<Artist> initArtistLoad() {
+    private void initArtistAsyncTask(ArtistLoaderAsync artistLoader){
         ContentResolver contentResolver = getActivity().getContentResolver();
-        String artistId, artistName, artistAlbums, artistTracks;
-        ArrayList<Artist> artistList = new ArrayList<>();
-        final String[] ARTIST_SUMMARY_PROJECTION = {
+        String[] ARTIST_SUMMARY_PROJECTION = {
                 MediaStore.Audio.Artists._ID,
                 MediaStore.Audio.Artists.ARTIST,
                 MediaStore.Audio.Artists.NUMBER_OF_ALBUMS,
@@ -118,29 +132,58 @@ public class ArtistsFragment extends Fragment {
 
         Uri artistUri = MediaStore.Audio.Artists.EXTERNAL_CONTENT_URI;
         String sortOrder = MediaStore.Audio.Artists.ARTIST + " ASC";
-        Cursor cursor = contentResolver.query(
+        final Cursor cursor = contentResolver.query(
                 artistUri,
                 ARTIST_SUMMARY_PROJECTION,
                 null, null,
                 sortOrder);
 
-        if (cursor != null && cursor.getCount() > 0) {
-            while (cursor.moveToNext()) {
-                artistId = cursor.getString(cursor.getColumnIndex(MediaStore.Audio.Artists._ID));
-                artistName = cursor.getString(cursor.getColumnIndex(MediaStore.Audio.Artists.ARTIST));
-                artistAlbums = cursor.getString(cursor.getColumnIndex(MediaStore.Audio.Artists.NUMBER_OF_ALBUMS));
-                artistTracks = cursor.getString(cursor.getColumnIndex(MediaStore.Audio.Artists.NUMBER_OF_TRACKS));
+        //begin artist load asynchronously
+        artistLoader.execute(cursor);
+    }
 
-                // Save to artistList
-                artistList.add(new Artist(artistId, artistName, artistAlbums, artistTracks));
-            }
+    private class ArtistLoaderAsync extends AsyncTask<Cursor, Artist, Void> {
+        RecyclerView.Adapter recyclerAdapter;
+        ContentResolver contentResolver;
+        String artistId, artistName, artistAlbums, artistTracks;
+        int position;
+
+        public ArtistLoaderAsync(RecyclerView.Adapter adapter) {
+            recyclerAdapter = adapter;
+            contentResolver = getActivity().getContentResolver();
+            position = -1;
         }
-        cursor.close();
 
-        if(artistList.isEmpty()) {
+        @Override
+        protected Void doInBackground(Cursor... cursors) {
+            Cursor passedCursor = cursors[0];
+
+            if (passedCursor != null && passedCursor.getCount() > 0) {
+                while (passedCursor.moveToNext()) {
+                    artistId = passedCursor.getString(passedCursor.getColumnIndex(MediaStore.Audio.Artists._ID));
+                    artistName = passedCursor.getString(passedCursor.getColumnIndex(MediaStore.Audio.Artists.ARTIST));
+                    artistAlbums = passedCursor.getString(passedCursor.getColumnIndex(MediaStore.Audio.Artists.NUMBER_OF_ALBUMS));
+                    artistTracks = passedCursor.getString(passedCursor.getColumnIndex(MediaStore.Audio.Artists.NUMBER_OF_TRACKS));
+
+                    position++;
+                    publishProgress(new Artist(artistId, artistName, artistAlbums, artistTracks));
+
+                    //periodically check if a cancel command was given, to exit rapidly
+                    if(isCancelled())break;
+                }
+            }
+            passedCursor.close();
             return null;
-        } else {
-            return artistList;
+        }
+        @Override
+        protected void onProgressUpdate(Artist... newArtist) {
+            //super.onProgressUpdate(values);
+            artistList.add(newArtist[0]);
+            recyclerAdapter.notifyItemInserted(position);
+        }
+        @Override
+        protected void onPostExecute(Void aVoid) {
+            //super.onPostExecute(aVoid);
         }
     }
 }
