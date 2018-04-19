@@ -5,13 +5,15 @@ import java.io.Serializable;
 public class Audio implements Serializable {
 
     private String data;
+    private String songId;
     private String title;
     private String album;
     private String artist;
     private String albumArt;
 
-    public Audio(String data, String title, String album, String artist, String albumArt) {
+    public Audio(String data, String id, String title, String album, String artist, String albumArt) {
         this.data = data;
+        this.songId = id;
         this.title = title;
         this.album = album;
         this.artist = artist;
@@ -25,6 +27,10 @@ public class Audio implements Serializable {
     public void setData(String data) {
         this.data = data;
     }
+
+    public String getSongId() { return songId; }
+
+    public void setSongId(String id) { this.songId = id; }
 
     public String getTitle() {
         return title;

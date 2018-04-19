@@ -42,7 +42,7 @@ public class StorageUtils {
         preferences = context.getSharedPreferences(STORAGE, Context.MODE_PRIVATE);
         SharedPreferences.Editor editor = preferences.edit();
         editor.putInt("audioFileIndex", index);
-        editor.apply();
+        editor.commit();
     }
     public int loadAudioIndex() {
         preferences = context.getSharedPreferences(STORAGE, Context.MODE_PRIVATE);
