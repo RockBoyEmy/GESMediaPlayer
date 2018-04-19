@@ -38,7 +38,7 @@ public class StorageUtils {
         return gson.fromJson(json, type);
     }
 
-    public void storeAudioIndex(int index) {
+    /*public void storeAudioIndex(int index) {
         preferences = context.getSharedPreferences(STORAGE, Context.MODE_PRIVATE);
         SharedPreferences.Editor editor = preferences.edit();
         editor.putInt("audioFileIndex", index);
@@ -47,7 +47,7 @@ public class StorageUtils {
     public int loadAudioIndex() {
         preferences = context.getSharedPreferences(STORAGE, Context.MODE_PRIVATE);
         return preferences.getInt("audioFileIndex", -1);//return -1 if no data found
-    }
+    }*/
 
     public void clearCachedAudioPlaylist() {
         preferences = context.getSharedPreferences(STORAGE, Context.MODE_PRIVATE);

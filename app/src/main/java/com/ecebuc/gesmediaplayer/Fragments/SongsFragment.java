@@ -40,6 +40,7 @@ public class SongsFragment extends Fragment {
     private SongLoaderAsync songLoader;
 
     public static final String BROADCAST_AUDIO_LOAD_COMPLETE = "com.ecebuc.gesmediaplayer.AudioLoadComplete";
+    private final String SONG_FRAGMENT_LOG = "SongFragment: ";
     private final String IS_FRAGMENT_TYPE_DEFAULT_TAG = "isFragmentDefaultTag";
     private String fragmentTitle;
 
@@ -126,10 +127,7 @@ public class SongsFragment extends Fragment {
                     Intent songUploadBroadcastIntent = new Intent(BROADCAST_AUDIO_LOAD_COMPLETE);
                     getActivity().sendBroadcast(songUploadBroadcastIntent);
                 }
-                storageUtils.storeAudioIndex(position);
-                String songId = songList.get(position).getSongId();
-                songFragmentCallback.playSelectedSongFromId(songId);
-                //Toast.makeText(getContext(), selectedSong.getTitle() + " is selected!", Toast.LENGTH_SHORT).show();
+                songFragmentCallback.playSelectedSong(position);
             }
             @Override
             public void onLongClick(View view, int position) {
@@ -161,7 +159,7 @@ public class SongsFragment extends Fragment {
 
     public interface OnSongFragmentInteractionListener {
         void updateToolbarTitleForFragment(String fragmentTitle);
-        void playSelectedSongFromId(String songId);
+        void playSelectedSong(int position);
     }
 
     private void initSongListFromId(String albumId){

@@ -3,7 +3,6 @@ package com.ecebuc.gesmediaplayer;
 import android.content.ComponentName;
 import android.content.Intent;
 import android.content.pm.PackageManager;
-import android.os.AsyncTask;
 import android.os.Bundle;
 import android.os.RemoteException;
 import android.support.design.widget.NavigationView;
@@ -25,12 +24,10 @@ import android.util.Log;
 import android.view.Menu;
 import android.view.MenuItem;
 
-import com.ecebuc.gesmediaplayer.Audios.Audio;
 import com.ecebuc.gesmediaplayer.Fragments.AlbumsFragment;
 import com.ecebuc.gesmediaplayer.Fragments.ArtistsFragment;
 import com.ecebuc.gesmediaplayer.Fragments.SongsFragment;
 
-import java.util.ArrayList;
 
 public class HomeActivity extends AppCompatActivity
         implements NavigationView.OnNavigationItemSelectedListener,
@@ -65,15 +62,6 @@ public class HomeActivity extends AppCompatActivity
                 MediaMetadataCompat metadata = gesMediaController.getMetadata();
                 PlaybackStateCompat pbState = gesMediaController.getPlaybackState();
 
-                //save the arrayList of audio files to shared preferences once loading is complete
-                //and broadcast this to the MediaPlaybackService so it can start loading songs
-                /*(!audioFilesOnDevice.isEmpty()){
-                    Intent audioLoadCompleteBroadcast = new Intent(BROADCAST_AUDIO_LOAD_COMPLETE);
-                    sendBroadcast(audioLoadCompleteBroadcast);
-                } else {
-                    Log.e("onConnected: ", "audioFilesOnDevice is empty...");
-                }*/
-
             } catch( RemoteException e ) {
                 e.getMessage();
                 Log.d(HOME_LOG, "onConnected: some exception was thrown, see what can you find out");
@@ -107,11 +95,9 @@ public class HomeActivity extends AppCompatActivity
 
             switch( state.getState() ) {
                 case PlaybackStateCompat.STATE_PLAYING: {
-                    //currentPlaybackState = STATE_PLAYING;
                     break;
                 }
                 case PlaybackStateCompat.STATE_PAUSED: {
-                    //currentPlaybackState = STATE_PAUSED;
                     break;
                 }
             }
@@ -205,9 +191,7 @@ public class HomeActivity extends AppCompatActivity
         super.onStop();
         Log.d(HOME_LOG, "onStop entered");
 
-        /* disconnect the media browser from the service and unregister
-         * the media controller callback but do not stop background music from playing
-         * this way we can use other apps but still listen to the audio playback */
+        //disconnect the media browser from the service but keep playing in background
         if (gesMediaController != null) {
             gesMediaController.unregisterCallback(mediaControllerCallbacks);
             Log.d(HOME_LOG, "control callback unregistered");
@@ -383,11 +367,14 @@ public class HomeActivity extends AppCompatActivity
         fragmentTransaction.commit();
     }
     @Override
-    public void playSelectedSongFromId(String songId){
+    public void playSelectedSong(int position){
         if(!MediaPlaybackService.isServiceStarted){
             startService(new Intent(this, MediaPlaybackService.class));
         }
-        gesPlaybackTransportControls.playFromMediaId(songId, null);
+        String stubSongId = "stub";
+        Bundle extras = new Bundle();
+        extras.putInt("songPosition", position);
+        gesPlaybackTransportControls.playFromMediaId(stubSongId, extras);
     }
 
 

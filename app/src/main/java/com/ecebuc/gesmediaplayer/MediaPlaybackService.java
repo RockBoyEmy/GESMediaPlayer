@@ -13,6 +13,7 @@ import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
 import android.media.AudioManager;
 import android.media.MediaPlayer;
+import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
 import android.os.PowerManager;
@@ -106,16 +107,20 @@ public class MediaPlaybackService extends MediaBrowserServiceCompat implements
     private void initMediaSessionMetadata() {
         MediaMetadataCompat.Builder metadataBuilder = new MediaMetadataCompat.Builder();
 
+        metadataBuilder.putString(MediaMetadataCompat.METADATA_KEY_TITLE, "Unknown song");
+        metadataBuilder.putString(MediaMetadataCompat.METADATA_KEY_ARTIST, "Unknown artist");
+        metadataBuilder.putString(MediaMetadataCompat.METADATA_KEY_ALBUM, "Unknown album");
+
         //Notification icon in card
-        metadataBuilder.putBitmap(MediaMetadataCompat.METADATA_KEY_DISPLAY_ICON, BitmapFactory.decodeResource(getResources(), R.mipmap.ic_launcher));
-        metadataBuilder.putBitmap(MediaMetadataCompat.METADATA_KEY_ALBUM_ART, BitmapFactory.decodeResource(getResources(), R.mipmap.ic_launcher));
+        //metadataBuilder.putBitmap(MediaMetadataCompat.METADATA_KEY_DISPLAY_ICON, BitmapFactory.decodeResource(getResources(), R.mipmap.ic_launcher));
+        //metadataBuilder.putBitmap(MediaMetadataCompat.METADATA_KEY_ALBUM_ART, BitmapFactory.decodeResource(getResources(), R.mipmap.ic_launcher));
 
         //lock screen icon for pre lollipop
-        metadataBuilder.putBitmap(MediaMetadataCompat.METADATA_KEY_ART, BitmapFactory.decodeResource(getResources(), R.mipmap.ic_launcher));
-        metadataBuilder.putString(MediaMetadataCompat.METADATA_KEY_DISPLAY_TITLE, "Display Title");
-        metadataBuilder.putString(MediaMetadataCompat.METADATA_KEY_DISPLAY_SUBTITLE, "Display Subtitle");
-        metadataBuilder.putLong(MediaMetadataCompat.METADATA_KEY_TRACK_NUMBER, 1);
-        metadataBuilder.putLong(MediaMetadataCompat.METADATA_KEY_NUM_TRACKS, 1);
+        //metadataBuilder.putBitmap(MediaMetadataCompat.METADATA_KEY_ART, BitmapFactory.decodeResource(getResources(), R.mipmap.ic_launcher));
+        //metadataBuilder.putString(MediaMetadataCompat.METADATA_KEY_DISPLAY_TITLE, "Display Title");
+        //metadataBuilder.putString(MediaMetadataCompat.METADATA_KEY_DISPLAY_SUBTITLE, "Display Subtitle");
+        //metadataBuilder.putLong(MediaMetadataCompat.METADATA_KEY_TRACK_NUMBER, 1);
+        //metadataBuilder.putLong(MediaMetadataCompat.METADATA_KEY_NUM_TRACKS, 1);
 
         gesMediaSession.setMetadata(metadataBuilder.build());
     }
@@ -151,8 +156,17 @@ public class MediaPlaybackService extends MediaBrowserServiceCompat implements
         gesMediaSession.setPlaybackState(playbackstateBuilder.build());
     }
     private void updateMetaData() {
-        Bitmap albumArt = BitmapFactory.decodeResource(getResources(),
-                R.drawable.skepty_face); //image cover in ../res/drawable/
+
+        Bitmap albumArt;
+        if(activeAudio.getAlbumArt() == null){
+            Log.d(SERVICE_LOG, "updateMetadata: current song has no album art");
+            albumArt = BitmapFactory.decodeResource(getResources(),
+                    R.drawable.skepty_face); //image cover in ../res/drawable/
+        }
+        else{
+            albumArt = BitmapFactory.decodeFile(activeAudio.getAlbumArt());
+        }
+
         // Update the current metadata
         gesMediaSession.setMetadata(new MediaMetadataCompat.Builder()
                 .putBitmap(MediaMetadataCompat.METADATA_KEY_ALBUM_ART, albumArt)
@@ -173,6 +187,7 @@ public class MediaPlaybackService extends MediaBrowserServiceCompat implements
         registerAudioLoadCompleteReceiver();
         initMediaPlayer();
         initMediaSession();
+        initMediaSessionMetadata();
         callStateListener();
 
         gesNotificationManager = (NotificationManager) getSystemService(Context.NOTIFICATION_SERVICE);
@@ -242,9 +257,9 @@ public class MediaPlaybackService extends MediaBrowserServiceCompat implements
     public void onPrepared(MediaPlayer mp){
         Log.d(SERVICE_LOG, "onPrepared: Media Player is ready for playback");
         gesMediaSession.setActive(true);
+        updateMetaData();
         gesMediaPlayer.start();
         setMediaPlaybackState(PlaybackStateCompat.STATE_PLAYING);
-        //createNotification();
         gesNotification = createNotification();
         startForeground(NOTIFICATION_ID, gesNotification);
         registerNoisyReceiver();
@@ -286,8 +301,6 @@ public class MediaPlaybackService extends MediaBrowserServiceCompat implements
     }
 
 
-
-
     //-----------------------------------Media Playback functions---------------------------------//
 
     //TODO: read about the AssetFileDescriptor, and the ResultReceiver for onPlayFromMediaId
@@ -326,6 +339,7 @@ public class MediaPlaybackService extends MediaBrowserServiceCompat implements
                 gesMediaPlayer.start();
                 setMediaPlaybackState(PlaybackStateCompat.STATE_PLAYING);
                 registerNoisyReceiver();
+
                 gesNotification = createNotification();
                 startForeground(NOTIFICATION_ID, gesNotification);
             }
@@ -337,11 +351,10 @@ public class MediaPlaybackService extends MediaBrowserServiceCompat implements
             if( gesMediaPlayer.isPlaying() ) {
                 gesMediaPlayer.pause();
                 unregisterReceiver(becomingNoisyReceiver);
-                //createNotification();
-                stopForeground(false);
+
                 setMediaPlaybackState(PlaybackStateCompat.STATE_PAUSED);
+                stopForeground(false);
                 gesNotification = createNotification();
-                //NotificationManager notificationManager = (NotificationManager) getSystemService(Context.NOTIFICATION_SERVICE);
                 gesNotificationManager.notify(NOTIFICATION_ID, gesNotification);
             }
         }
@@ -358,11 +371,8 @@ public class MediaPlaybackService extends MediaBrowserServiceCompat implements
                 activeAudio = audioList.get(++audioIndex);
             }
 
-            //Update stored index
-            new StorageUtils(getApplicationContext()).storeAudioIndex(audioIndex);
-
             //reset mediaPlayer
-            gesMediaPlayer.pause();
+            //gesMediaPlayer.pause();
             gesMediaPlayer.reset();
             initMediaPlayer();
 
@@ -374,9 +384,6 @@ public class MediaPlaybackService extends MediaBrowserServiceCompat implements
                 e.printStackTrace();
                 stopSelf();
             }
-
-            //updateMetaData();
-            //createNotification();
         }
         @Override
         public void onSkipToPrevious() {
@@ -390,11 +397,8 @@ public class MediaPlaybackService extends MediaBrowserServiceCompat implements
                 activeAudio = audioList.get(--audioIndex);
             }
 
-            //Update stored index
-            new StorageUtils(getApplicationContext()).storeAudioIndex(audioIndex);
-
             //reset mediaPlayer
-            gesMediaPlayer.pause();
+            //gesMediaPlayer.pause();
             gesMediaPlayer.reset();
             initMediaPlayer();
 
@@ -406,9 +410,6 @@ public class MediaPlaybackService extends MediaBrowserServiceCompat implements
                 e.printStackTrace();
                 stopSelf();
             }
-
-            //updateMetaData();
-            //createNotification();
         }
         @Override
         public void onStop() {
@@ -423,7 +424,6 @@ public class MediaPlaybackService extends MediaBrowserServiceCompat implements
             gesMediaSession.setActive(false);
             gesMediaPlayer.stop();
             stopForeground(true);
-            //removeNotification();
         }
         @Override
         public void onPlayFromMediaId(String mediaId, Bundle extras) {
@@ -432,31 +432,25 @@ public class MediaPlaybackService extends MediaBrowserServiceCompat implements
             gesMediaPlayer.reset();
             initMediaPlayer();
 
-            // Given this function is called, there should be a guarrantee for .getIndes
-            audioIndex = storageUtils.loadAudioIndex();
+            audioIndex = extras.getInt("songPosition");
+
+            // Given this function is called, there should be a guarantee for .getInt
             if(audioIndex != -1){
                 activeAudio = audioList.get(audioIndex);
             }
-            else { Log.e(SERVICE_LOG, "onPlayFromMediaId: audioIndex is null"); }
+            else {
+                Log.e(SERVICE_LOG, "onPlayFromMediaId: audioIndex is null");
+                activeAudio = audioList.get(audioIndex++);
+            }
 
             try {
                 //gesMediaPlayer.setDataSource(afd.getFileDescriptor(), afd.getStartOffset(), afd.getLength());
                 gesMediaPlayer.setDataSource(activeAudio.getData());
+                gesMediaPlayer.prepareAsync();
 
             } catch (IOException e) {
                 e.printStackTrace();
-                return;
             }
-
-
-            try {
-                gesMediaPlayer.prepare();
-            } catch (IOException e) {
-                e.printStackTrace();
-                Log.d("onPlayFromId: ", "mediaPlayer failed to prepare");
-            }
-
-            //Work with extras here if you want
         }
         @Override
         public void onSeekTo(long pos) {
@@ -633,11 +627,9 @@ public class MediaPlaybackService extends MediaBrowserServiceCompat implements
         Intent playPauseSongIntent = new Intent();
         Intent previousSongIntent = new Intent(ACTION_PREVIOUS);
         Intent nextSongIntent = new Intent(ACTION_NEXT);
-        Intent stopIntent = new Intent(ACTION_STOP);
+        //Intent stopIntent = new Intent(ACTION_STOP);
 
         PendingIntent playPauseSongPendingIntent = null;
-        PendingIntent stopPendingIntent = PendingIntent.getBroadcast(this, 0,
-                                                                    stopIntent, 0);
         PendingIntent previousSongPendingIntent = PendingIntent.getBroadcast(this, 0,
                                                                     previousSongIntent, 0);
         PendingIntent nextSongPendingIntent = PendingIntent.getBroadcast(this, 0,
@@ -676,19 +668,16 @@ public class MediaPlaybackService extends MediaBrowserServiceCompat implements
 
         //TODO this doesn't work for now - starting the activity when clicking the notification
         Intent notificationClickIntent = new Intent(this, MainActivity.class);
-        notificationClickIntent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TASK);
+        notificationClickIntent.setFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP | Intent.FLAG_ACTIVITY_NEW_TASK);
         PendingIntent clickActivityStart = PendingIntent.getActivity(this, 0,
-                                            notificationClickIntent, PendingIntent.FLAG_UPDATE_CURRENT);
+                                            notificationClickIntent, 0);
 
         NotificationCompat.Builder notificationBuilder = (NotificationCompat.Builder)
                 new NotificationCompat.Builder(this, CHANNEL_ID);
         notificationBuilder
                 // Enable launching the player by clicking the notification
                 //.setContentIntent(gesMediaSession.getController().getSessionActivity())
-                .setContentIntent(clickActivityStart) //TODO doesn't work well for now, restarts, leaking receivers
-
-                // Stop the service when the notification is swiped away //TODO: not working, see cancelButton
-                //.setDeleteIntent(stopPendingIntent)
+                //.setContentIntent(clickActivityStart) //TODO doesn't work well for now, restarts, leaking receivers
 
                 // Make the transport controls visible on the lockscreen
                 .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
@@ -698,15 +687,12 @@ public class MediaPlaybackService extends MediaBrowserServiceCompat implements
                         // Attach our MediaSession token - to display artwork in lock screen
                         .setMediaSession(gesMediaSession.getSessionToken())
                         // Show our playback controls in the compact notification view.
-                        .setShowActionsInCompactView(0, 1, 2)
-                        /*.setShowCancelButton(true)
-                        .setCancelButtonIntent(stopPendingIntent)*/)
+                        .setShowActionsInCompactView(0, 1, 2))
 
                 // Set the Notification color
                 .setColor(getResources().getColor(R.color.colorPrimaryDark))
 
                 // Set the large and small icons
-                //.setSmallIcon(android.R.drawable.stat_sys_headset)
                 .setSmallIcon(R.drawable.ic_headset_black_24dp)
                 .setLargeIcon(largeIcon)
 
@@ -717,22 +703,15 @@ public class MediaPlaybackService extends MediaBrowserServiceCompat implements
                 .setShowWhen(false) //don't display timestamp
 
                 // Set notification action buttons for music playback
-                .addAction(R.drawable.ic_skip_previous_black_24dp/*android.R.drawable.ic_media_previous*/,
+                .addAction(R.drawable.ic_skip_previous_black_24dp,
                         "Previous",
                         previousSongPendingIntent)
                 .addAction(playPauseNotificationIcon, "PlayPause", playPauseSongPendingIntent)
-                .addAction(R.drawable.ic_skip_next_black_24dp/*android.R.drawable.ic_media_next*/,
+                .addAction(R.drawable.ic_skip_next_black_24dp,
                         "Next",
                         nextSongPendingIntent);
 
-        //.build();
-        /*((NotificationManager) getSystemService(Context.NOTIFICATION_SERVICE))
-                .notify(NOTIFICATION_ID, notificationBuilder.build());*/
         return notificationBuilder.build();
-    }
-    private void removeNotification() {
-        NotificationManager notificationManager = (NotificationManager) getSystemService(Context.NOTIFICATION_SERVICE);
-        notificationManager.cancel(NOTIFICATION_ID);
     }
 
     //------------------------------------Less important methods----------------------------------//

@@ -10,7 +10,7 @@
         android:id="@+id/main_albumCoverLarge"
         android:layout_width="match_parent"
         android:layout_height="match_parent"
-        app:layout_constraintBottom_toTopOf="@+id/loadNavActivity_btn"
+        android:scaleType="centerCrop"
         app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintTop_toTopOf="parent"
@@ -54,12 +54,14 @@
             app:layout_constraintVertical_bias="0.0" />
 
         <TextView
-            android:id="@+id/home_header_titleView"
-            android:layout_width="wrap_content"
+            android:id="@+id/home_header_songTitle"
+            android:layout_width="0dp"
             android:layout_height="wrap_content"
             android:layout_marginEnd="16dp"
             android:layout_marginStart="16dp"
             android:layout_marginTop="16dp"
+            android:ellipsize="end"
+            android:singleLine="true"
             android:text="Song name"
             android:textColor="@color/textPrimaryOnDark"
             android:textSize="18sp"
@@ -71,16 +73,19 @@
             app:layout_constraintTop_toTopOf="parent" />
 
         <TextView
-            android:id="@+id/home_header_artistView"
-            android:layout_width="wrap_content"
+            android:id="@+id/home_header_artistName"
+            android:layout_width="0dp"
             android:layout_height="wrap_content"
+            android:ellipsize="end"
+            android:singleLine="true"
             android:text="Artist"
             android:textColor="@color/textSecondaryOnDark"
             android:textSize="16sp"
             android:textStyle="normal"
             android:visibility="visible"
-            app:layout_constraintStart_toStartOf="@+id/home_header_titleView"
-            app:layout_constraintTop_toBottomOf="@+id/home_header_titleView" />
+            app:layout_constraintEnd_toEndOf="@+id/home_header_songTitle"
+            app:layout_constraintStart_toStartOf="@+id/home_header_songTitle"
+            app:layout_constraintTop_toBottomOf="@+id/home_header_songTitle" />
 
     </android.support.constraint.ConstraintLayout>
 
@@ -89,29 +94,13 @@
         android:id="@+id/playPause_btn"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:layout_marginBottom="272dp"
+        android:layout_marginBottom="120dp"
         android:layout_marginEnd="8dp"
         android:layout_marginStart="8dp"
         android:text="Toggle Play/Pause"
         app:layout_constraintBottom_toTopOf="@+id/progress"
         app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintStart_toStartOf="parent" />
-
-    <Button
-        android:id="@+id/loadNavActivity_btn"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:layout_marginBottom="8dp"
-        android:layout_marginEnd="8dp"
-        android:layout_marginStart="8dp"
-        android:layout_marginTop="8dp"
-        android:text="Load Activity"
-        app:layout_constraintBottom_toTopOf="@+id/playPause_btn"
-        app:layout_constraintEnd_toEndOf="parent"
-        app:layout_constraintHorizontal_bias="0.498"
-        app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintTop_toTopOf="parent"
-        app:layout_constraintVertical_bias="0.939" />
 
     <SeekBar
         android:id="@+id/progress"

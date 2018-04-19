@@ -11,5 +11,5 @@
     <color name="white">#fff</color>
 
     <color name="GESBackground">#f6212121</color>
-    <color name="GESOverlayBackground">#f2424242</color>
+    <color name="GESOverlayBackground">#dc424242</color>
 </resources>
