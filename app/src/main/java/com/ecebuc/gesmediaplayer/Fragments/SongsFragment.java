@@ -2,6 +2,7 @@ package com.ecebuc.gesmediaplayer.Fragments;
 
 import android.content.ContentResolver;
 import android.content.Context;
+import android.content.Intent;
 import android.database.Cursor;
 import android.net.Uri;
 import android.os.AsyncTask;
@@ -19,6 +20,7 @@ import android.view.ViewGroup;
 import android.widget.Toast;
 
 import com.ecebuc.gesmediaplayer.AudioUtils.SongAdapter;
+import com.ecebuc.gesmediaplayer.AudioUtils.StorageUtils;
 import com.ecebuc.gesmediaplayer.Audios.Audio;
 import com.ecebuc.gesmediaplayer.R;
 import com.ecebuc.gesmediaplayer.Utils.SimpleDividerItemDecoration;
@@ -34,8 +36,10 @@ public class SongsFragment extends Fragment {
     private RecyclerView.Adapter songRecyclerAdapter;
     private RecyclerView.LayoutManager recyclerLayoutManager;
     private ArrayList<Audio> songList = new ArrayList<>();
+    private StorageUtils storageUtils;
     private SongLoaderAsync songLoader;
 
+    public static final String BROADCAST_AUDIO_LOAD_COMPLETE = "com.ecebuc.gesmediaplayer.AudioLoadComplete";
     private final String IS_FRAGMENT_TYPE_DEFAULT_TAG = "isFragmentDefaultTag";
     private String fragmentTitle;
 
@@ -69,6 +73,8 @@ public class SongsFragment extends Fragment {
     public void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
 
+        storageUtils = new StorageUtils(getContext());
+
         Bundle args = getArguments();
         paramIsFragmentDefault = args.getBoolean(IS_FRAGMENT_TYPE_DEFAULT_TAG, true);
 
@@ -85,7 +91,7 @@ public class SongsFragment extends Fragment {
         }
     }
     @Override
-    public View onCreateView(LayoutInflater inflater, ViewGroup container, Bundle savedInstanceState) {
+    public View onCreateView(LayoutInflater inflater, ViewGroup container, final Bundle savedInstanceState) {
         // Inflate the layout for this fragment
         View rootView = inflater.inflate(R.layout.fragment_songs, container, false);
 
@@ -115,8 +121,15 @@ public class SongsFragment extends Fragment {
         songRecyclerView.addOnItemTouchListener(new RecyclerTouchListener(getContext(), songRecyclerView, new RecyclerTouchListener.ClickListener() {
             @Override
             public void onClick(View view, int position) {
-                Audio selectedSong = songList.get(position);
-                Toast.makeText(getContext(), selectedSong.getTitle() + " is selected!", Toast.LENGTH_SHORT).show();
+                // If current fragment is created from an album notify service to reload songList
+                if(!paramIsFragmentDefault){
+                    Intent songUploadBroadcastIntent = new Intent(BROADCAST_AUDIO_LOAD_COMPLETE);
+                    getActivity().sendBroadcast(songUploadBroadcastIntent);
+                }
+                storageUtils.storeAudioIndex(position);
+                String songId = songList.get(position).getSongId();
+                songFragmentCallback.playSelectedSongFromId(songId);
+                //Toast.makeText(getContext(), selectedSong.getTitle() + " is selected!", Toast.LENGTH_SHORT).show();
             }
             @Override
             public void onLongClick(View view, int position) {
@@ -148,15 +161,16 @@ public class SongsFragment extends Fragment {
 
     public interface OnSongFragmentInteractionListener {
         void updateToolbarTitleForFragment(String fragmentTitle);
+        void playSelectedSongFromId(String songId);
     }
 
-    private void initSongListFromId(String id){
+    private void initSongListFromId(String albumId){
         ContentResolver contentResolver = getActivity().getContentResolver();
-        String data, title, album, artist, albumArt, albumId;
+        String data, title, album, artist, albumArt, id;
 
         Uri uri = MediaStore.Audio.Media.EXTERNAL_CONTENT_URI;
         String selection = MediaStore.Audio.Media.IS_MUSIC + "!= 0";
-        selection += " and album_id = " + id;
+        selection += " and album_id = " + albumId;
         String sortOrder = MediaStore.Audio.AudioColumns.TRACK + " ASC";
 
         String[] SONG_SUMMARY_PROJECTION = {
@@ -164,7 +178,8 @@ public class SongsFragment extends Fragment {
                 MediaStore.Audio.Media.ARTIST,
                 MediaStore.Audio.Media.DATA,
                 MediaStore.Audio.Media.ALBUM,
-                MediaStore.Audio.Media.ALBUM_ID
+                MediaStore.Audio.Media.ALBUM_ID,
+                MediaStore.Audio.Media._ID
         };
 
         Cursor cursor = contentResolver.query(uri,
@@ -175,7 +190,7 @@ public class SongsFragment extends Fragment {
         Cursor albumArtCursor = contentResolver.query(MediaStore.Audio.Albums.EXTERNAL_CONTENT_URI,
                 new String[] {MediaStore.Audio.Albums._ID, MediaStore.Audio.Albums.ALBUM_ART},
                 MediaStore.Audio.Albums._ID + "=?",
-                new String[] {String.valueOf(id)},
+                new String[] {String.valueOf(albumId)},
                 null);
         albumArtCursor.moveToFirst();
         albumArt = albumArtCursor.getString(albumArtCursor.getColumnIndex(MediaStore.Audio.Albums.ALBUM_ART));
@@ -183,13 +198,14 @@ public class SongsFragment extends Fragment {
 
         if (cursor != null && cursor.getCount() > 0) {
             while (cursor.moveToNext()) {
+                id = cursor.getString(cursor.getColumnIndex(MediaStore.Audio.Media._ID));
                 title = cursor.getString(cursor.getColumnIndex(MediaStore.Audio.Media.TITLE));
                 album = cursor.getString(cursor.getColumnIndex(MediaStore.Audio.Media.ALBUM));
                 artist = cursor.getString(cursor.getColumnIndex(MediaStore.Audio.Media.ARTIST));
                 data = cursor.getString(cursor.getColumnIndex(MediaStore.Audio.Media.DATA));
 
                 // Save to audioList
-                songList.add(new Audio(data, title, album, artist, albumArt));
+                songList.add(new Audio(data, id, title, album, artist, albumArt));
                 songRecyclerView.getAdapter().notifyItemInserted(cursor.getPosition());
             }
             //set the fragment name to the artist of which we are displaying the albums
@@ -197,6 +213,10 @@ public class SongsFragment extends Fragment {
             fragmentTitle = cursor.getString(cursor.getColumnIndex(MediaStore.Audio.Media.ALBUM));
         }
         cursor.close();
+
+        // Upload songs, but do not broadcast, will be done onClick
+        storageUtils.clearCachedAudioPlaylist();
+        storageUtils.storeAudio(songList);
     }
     private void initSongAsyncTask(SongLoaderAsync songLoader){
         ContentResolver contentResolver = getActivity().getContentResolver();
@@ -205,7 +225,8 @@ public class SongsFragment extends Fragment {
                 MediaStore.Audio.Media.ARTIST,
                 MediaStore.Audio.Media.DATA,
                 MediaStore.Audio.Media.ALBUM,
-                MediaStore.Audio.Media.ALBUM_ID
+                MediaStore.Audio.Media.ALBUM_ID,
+                MediaStore.Audio.Media._ID
         };
 
         Uri songUri = MediaStore.Audio.Media.EXTERNAL_CONTENT_URI;
@@ -224,13 +245,15 @@ public class SongsFragment extends Fragment {
     private class SongLoaderAsync extends AsyncTask<Cursor, Audio, Void> {
         RecyclerView.Adapter recyclerAdapter;
         ContentResolver contentResolver;
-        String data, title, album, artist, albumArt, albumId;
-        int position;
+        String data, title, album, artist, albumArt, id, albumId;
+        int position, countBeforeSongUpload;
+        final int TIMES_BEFORE_UPLOAD = 70;
 
         public SongLoaderAsync(RecyclerView.Adapter adapter) {
             recyclerAdapter = adapter;
             contentResolver = getActivity().getContentResolver();
             position = -1;
+            countBeforeSongUpload = TIMES_BEFORE_UPLOAD;
         }
 
         @Override
@@ -238,6 +261,7 @@ public class SongsFragment extends Fragment {
 
             if (passedCursor[0] != null && passedCursor[0].getCount() > 0) {
                 while (passedCursor[0].moveToNext()) {
+                    id = passedCursor[0].getString(passedCursor[0].getColumnIndex(MediaStore.Audio.Media._ID));
                     albumId = passedCursor[0].getString(passedCursor[0].getColumnIndex(MediaStore.Audio.Media.ALBUM_ID));
                     data = passedCursor[0].getString(passedCursor[0].getColumnIndex(MediaStore.Audio.Media.DATA));
                     title = passedCursor[0].getString(passedCursor[0].getColumnIndex(MediaStore.Audio.Media.TITLE));
@@ -253,10 +277,22 @@ public class SongsFragment extends Fragment {
                     albumArt = albumArtCursor.getString(albumArtCursor.getColumnIndex(MediaStore.Audio.Albums.ALBUM_ART));
 
                     position++;
-                    publishProgress(new Audio(data, title, album, artist, albumArt));
+                    publishProgress(new Audio(data, id, title, album, artist, albumArt));
 
                     //periodically check if a cancel command was given, to exit rapidly
                     if(isCancelled())break;
+
+                    //add some items to songList, upload to SharedPreferences and reset counter
+                    if(countBeforeSongUpload == 0){
+                        storageUtils.clearCachedAudioPlaylist();
+                        storageUtils.storeAudio(songList);
+                        Intent songUploadBroadcastIntent = new Intent(BROADCAST_AUDIO_LOAD_COMPLETE);
+                        getActivity().sendBroadcast(songUploadBroadcastIntent);
+                        countBeforeSongUpload = TIMES_BEFORE_UPLOAD;
+                    }
+                    else{
+                        countBeforeSongUpload--;
+                    }
                 }
             }
             passedCursor[0].close();
@@ -267,11 +303,14 @@ public class SongsFragment extends Fragment {
             //super.onProgressUpdate(newSong);
             songList.add(newSong[0]);
             recyclerAdapter.notifyItemInserted(position);
-
         }
         @Override
         protected void onPostExecute(Void aVoid) {
-            //super.onPostExecute(aVoid);
+            // Upload song list one last time
+            storageUtils.clearCachedAudioPlaylist();
+            storageUtils.storeAudio(songList);
+            Intent songUploadBroadcastIntent = new Intent(BROADCAST_AUDIO_LOAD_COMPLETE);
+            getActivity().sendBroadcast(songUploadBroadcastIntent);
         }
     }
 }

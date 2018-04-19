@@ -34,6 +34,7 @@ import android.util.Log;
 
 import com.ecebuc.gesmediaplayer.AudioUtils.StorageUtils;
 import com.ecebuc.gesmediaplayer.Audios.Audio;
+import com.ecebuc.gesmediaplayer.Fragments.SongsFragment;
 
 import java.io.IOException;
 import java.util.ArrayList;
@@ -47,7 +48,9 @@ public class MediaPlaybackService extends MediaBrowserServiceCompat implements
         AudioManager.OnAudioFocusChangeListener {
 
     public static boolean isServiceStarted = false;
+    private final String SERVICE_LOG = "GES SERVICE: ";
 
+    private StorageUtils storageUtils;
     private ArrayList<Audio> audioList;
     private Audio activeAudio = null;
     private static int audioIndex = -1;
@@ -123,7 +126,7 @@ public class MediaPlaybackService extends MediaBrowserServiceCompat implements
     }
     private void registerAudioLoadCompleteReceiver() {
         //Register playNewAudio receiver
-        IntentFilter filter = new IntentFilter(MainActivity.BROADCAST_AUDIO_LOAD_COMPLETE);
+        IntentFilter filter = new IntentFilter(SongsFragment.BROADCAST_AUDIO_LOAD_COMPLETE);
         registerReceiver(audioLoadComplete, filter);
     }
     private void registerNotificationCommandReceiver(){
@@ -166,7 +169,7 @@ public class MediaPlaybackService extends MediaBrowserServiceCompat implements
     public void onCreate() {
         super.onCreate();
 
-        Log.d("service onCreate: ", "Service created");
+        Log.d(SERVICE_LOG, "onCreate entered");
         registerAudioLoadCompleteReceiver();
         initMediaPlayer();
         initMediaSession();
@@ -185,7 +188,7 @@ public class MediaPlaybackService extends MediaBrowserServiceCompat implements
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             // Create the NotificationChannel
             String name = "GES Notification Channel";
-            String description = "This is the GES Media Player notification channel - test";
+            String description = "This is the GES Media Player notification channel";
             int importance = NotificationManager.IMPORTANCE_DEFAULT;
             long vibrationP[] = {0}; //to eliminate vibration for every command on notification
 
@@ -196,25 +199,22 @@ public class MediaPlaybackService extends MediaBrowserServiceCompat implements
             // or other notification behaviors after this
             gesNotificationManager.createNotificationChannel(mChannel);
         }
-        Log.d("service onCreate: ", "exited service onCreate");
+        Log.d(SERVICE_LOG, "onCreate exited");
     }
     @Override
     public int onStartCommand(Intent intent, int flags, int startId) {
-        Log.d("onStartCommand: ", "Service has been started");
+        Log.d(SERVICE_LOG, "onStartCommand entered");
         isServiceStarted = true;
         registerNotificationCommandReceiver();
 
-        PlaybackStateCompat pbState = gesMediaSession.getController().getPlaybackState();
-        Log.d("onPlay: ", "current playback state is: " + pbState.getState());
-
         MediaButtonReceiver.handleIntent(gesMediaSession, intent);
-        Log.d("onStartCommand: ", "exited onStartCommand method");
+        Log.d(SERVICE_LOG, "onStartCommand exited");
         return super.onStartCommand(intent, flags, startId);
     }
     @Override
     public void onDestroy() {
         super.onDestroy();
-        Log.d("service onDestroy: ", "onDestroy just entered");
+        Log.d(SERVICE_LOG, "onDestroy entered");
 
         //Disable the PhoneStateListener
         if (phoneStateListener != null) {
@@ -233,14 +233,14 @@ public class MediaPlaybackService extends MediaBrowserServiceCompat implements
         if(isServiceStarted){
             unregisterReceiver(notificationPlaybackCommand);
         }
-        Log.d("service onDestroy: ", "everything unregistered and cleared in service, exiting...");
+        Log.d(SERVICE_LOG, "onDestroy entered, everything was unregistered and cleared...");
     }
 
 
     //---------------------------------Media Player Listeners-------------------------------------//
     @Override
     public void onPrepared(MediaPlayer mp){
-        Log.d("onPrepared: ", "Media Player is ready for playback");
+        Log.d(SERVICE_LOG, "onPrepared: Media Player is ready for playback");
         gesMediaSession.setActive(true);
         gesMediaPlayer.start();
         setMediaPlaybackState(PlaybackStateCompat.STATE_PLAYING);
@@ -254,6 +254,7 @@ public class MediaPlaybackService extends MediaBrowserServiceCompat implements
         if( gesMediaPlayer != null ) {
             //gesMediaPlayer.reset();
             transportControls.skipToNext();
+            Log.d(SERVICE_LOG, "Song completed. Moving to the next...");
             //should not reset in here because it breaks controls of the
             //notification as the song changes, should only skip to next
         }
@@ -295,13 +296,13 @@ public class MediaPlaybackService extends MediaBrowserServiceCompat implements
         public void onPlay() {
             super.onPlay();
             if(!requestAudioFocus()) {
-                Log.d("onPlay: ", "Failed to gain focus");
+                Log.d(SERVICE_LOG, "onPlay: Failed to gain focus");
                 return;
             }
             //check if service is started, not only bound
             //will call onStartCommand when service is started, otherwise no
             if(!isServiceStarted){
-                Log.d("onPlay: ", "service was called to be started");
+                Log.d(SERVICE_LOG, "onPlay: service was called to be started");
                 startService(new Intent(getApplicationContext(), MediaPlaybackService.class));
             }
 
@@ -315,7 +316,7 @@ public class MediaPlaybackService extends MediaBrowserServiceCompat implements
                     gesMediaPlayer.prepareAsync();
                 } catch (IOException e) {
                     e.printStackTrace();
-                    Log.e("MUSIC SERVICE", "Error setting data source", e);
+                    Log.e(SERVICE_LOG, "onPlay: Error setting data source", e);
                     stopSelf();
                 }
             }
@@ -328,15 +329,6 @@ public class MediaPlaybackService extends MediaBrowserServiceCompat implements
                 gesNotification = createNotification();
                 startForeground(NOTIFICATION_ID, gesNotification);
             }
-
-            /*if(gesMediaSession.getController().getPlaybackState().getState() == PlaybackStateCompat.STATE_PAUSED){
-                gesMediaSession.setActive(true);
-                gesMediaPlayer.start();
-                setMediaPlaybackState(PlaybackStateCompat.STATE_PLAYING);
-                registerNoisyReceiver();
-                //createNotification();
-                startForeground(NOTIFICATION_ID, gesNotification);
-            }*/
         }
         @Override
         public void onPause() {
@@ -437,29 +429,25 @@ public class MediaPlaybackService extends MediaBrowserServiceCompat implements
         public void onPlayFromMediaId(String mediaId, Bundle extras) {
             super.onPlayFromMediaId(mediaId, extras);
 
+            gesMediaPlayer.reset();
+            initMediaPlayer();
+
+            // Given this function is called, there should be a guarrantee for .getIndes
+            audioIndex = storageUtils.loadAudioIndex();
+            if(audioIndex != -1){
+                activeAudio = audioList.get(audioIndex);
+            }
+            else { Log.e(SERVICE_LOG, "onPlayFromMediaId: audioIndex is null"); }
+
             try {
-                AssetFileDescriptor afd = getResources().openRawResourceFd(Integer.valueOf(mediaId));
-                if( afd == null ) {
-                    Log.d("afd: ", "afd in onPlayFromMediaId is null");
-                    return;
-                }
-
-                try {
-                    gesMediaPlayer.setDataSource(afd.getFileDescriptor(), afd.getStartOffset(), afd.getLength());
-
-                } catch( IllegalStateException e ) {
-                    gesMediaPlayer.release();
-                    initMediaPlayer();
-                    gesMediaPlayer.setDataSource(afd.getFileDescriptor(), afd.getStartOffset(), afd.getLength());
-                }
-
-                afd.close();
-                initMediaSessionMetadata();
+                //gesMediaPlayer.setDataSource(afd.getFileDescriptor(), afd.getStartOffset(), afd.getLength());
+                gesMediaPlayer.setDataSource(activeAudio.getData());
 
             } catch (IOException e) {
                 e.printStackTrace();
                 return;
             }
+
 
             try {
                 gesMediaPlayer.prepare();
@@ -600,22 +588,22 @@ public class MediaPlaybackService extends MediaBrowserServiceCompat implements
     private BroadcastReceiver audioLoadComplete = new BroadcastReceiver() {
         @Override
         public void onReceive(Context context, Intent intent) {
-            Log.d("audioLoadReceiver: ", "entered onReceive");
-            StorageUtils storageUtils = new StorageUtils(getApplicationContext());
+            Log.d(SERVICE_LOG, "entered audioLoadReceiver onReceive");
+            storageUtils = new StorageUtils(getApplicationContext());
             audioList = storageUtils.loadAudio();
             if(audioList.isEmpty()){
                 Log.e("onReceive: ", "audioList is empty after loading");
                 //TODO: will have to handle scenario of no songs on device (app mustn't crash)
                 return;
             }
-            Log.d("audioLoadReceiver: ", "exited onReceive");
+            Log.d(SERVICE_LOG, "exited onReceive");
         }
     };
 
     private BroadcastReceiver notificationPlaybackCommand = new BroadcastReceiver() {
         @Override
         public void onReceive(Context context, Intent intent) {
-            Log.d("notifPlayCommand: ", "entered onReceive");
+            Log.d(SERVICE_LOG, "notificationPlaybackCommand: entered onReceive");
 
             if (intent == null || intent.getAction() == null) return;
 
@@ -632,7 +620,7 @@ public class MediaPlaybackService extends MediaBrowserServiceCompat implements
                 transportControls.stop();
             }
 
-            Log.d("notifPlayCommand: ", "exited onReceive");
+            Log.d(SERVICE_LOG, "notificationPlaybackCommand: exited onReceive");
         }
     };
 

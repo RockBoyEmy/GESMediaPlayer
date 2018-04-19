@@ -9,6 +9,7 @@ import android.net.Uri;
 import android.os.RemoteException;
 import android.provider.MediaStore;
 import android.support.v4.app.ActivityCompat;
+import android.support.v4.app.NavUtils;
 import android.support.v4.content.ContextCompat;
 import android.support.v4.media.MediaBrowserCompat;
 import android.support.v4.media.MediaMetadataCompat;
@@ -19,6 +20,8 @@ import android.os.Bundle;
 import android.util.Log;
 import android.view.View;
 import android.widget.Button;
+import android.widget.ImageView;
+import android.widget.Toast;
 
 import com.ecebuc.gesmediaplayer.AudioUtils.StorageUtils;
 import com.ecebuc.gesmediaplayer.Audios.Audio;
@@ -28,9 +31,10 @@ import java.util.ArrayList;
 public class MainActivity extends AppCompatActivity implements View.OnClickListener {
 
     Button playPauseToggleButton, loadNavActivityButton;
+    ImageView headerBackButtons;
 
     private final int REQUEST_CODE_GESPLAYER_EXTERNAL_STORAGE = 101;
-    public static final String BROADCAST_AUDIO_LOAD_COMPLETE = "com.ecebuc.gesmediaplayer.AudioLoadComplete";
+    private final String MAIN_LOG = "MAIN ACTIVITY: ";
     private static final int STATE_PAUSED = 0;
     private static final int STATE_PLAYING = 1;
     private static int currentPlaybackState;
@@ -51,7 +55,7 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
         public void onConnected() {
             super.onConnected();
             try {
-                Log.d("onConnected: ", "entered onConnected");
+                Log.d(MAIN_LOG, "entered onConnected");
                 //create the media controller and register the callbacks to stay in sync
                 gesMediaController = new MediaControllerCompat(MainActivity.this, gesMediaBrowser.getSessionToken());
                 gesMediaController.registerCallback(mediaControllerCallbacks);
@@ -65,31 +69,22 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
                 MediaMetadataCompat metadata = gesMediaController.getMetadata();
                 PlaybackStateCompat pbState = gesMediaController.getPlaybackState();
 
-                //save the arrayList of audio files to shared preferences once loading is complete
-                //and broadcast this to the MediaPlaybackService so it can start loading songs
-                if(!audioFilesOnDevice.isEmpty()){
-                    Intent audioLoadCompleteBroadcast = new Intent(BROADCAST_AUDIO_LOAD_COMPLETE);
-                    sendBroadcast(audioLoadCompleteBroadcast);
-                } else {
-                    Log.e("onConnected: ", "audioFilesOnDevice is empty...");
-                }
-
             } catch( RemoteException e ) {
                 e.getMessage();
-                Log.d("onConnected: ", "some exception was thrown, see what can you find out");
+                Log.d(MAIN_LOG, "onConnected some exception was thrown, see what can you find out");
             }
-            Log.d("onConnected: ", "left onConnect");
+            Log.d(MAIN_LOG, "left onConnected");
         }
         @Override
         public void onConnectionSuspended() {
             // The Service has crashed. Disable transport controls until it automatically reconnects
-            Log.d("onConnectionSuspend: ", "the service has crashed");
+            Log.d(MAIN_LOG, "onConnectionSuspended the service has crashed");
             gesPlaybackTransportControls = null;
         }
         @Override
         public void onConnectionFailed() {
             // The Service has refused our connection
-            Log.d("onConnectionFail: ", "the service hasn't been able to connect");
+            Log.d(MAIN_LOG, "onConnectionFailed: the service hasn't been able to connect");
         }
     };
     private MediaControllerCompat.Callback mediaControllerCallbacks = new MediaControllerCompat.Callback() {
@@ -101,7 +96,7 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
         public void onPlaybackStateChanged(PlaybackStateCompat state) {
             super.onPlaybackStateChanged(state);
             if( state == null ) {
-                Log.d("onPlaybackChange: ", "the state is null");
+                Log.d(MAIN_LOG, "onPlaybackStateChanged: the state is null");
                 return;
             }
 
@@ -130,11 +125,12 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
-        Log.d("onCreate: ", "entered onCreate");
+        Log.d(MAIN_LOG, "onCreate entered");
 
         //grab the buttons for media playback control
         playPauseToggleButton = (Button) findViewById(R.id.playPause_btn);
         loadNavActivityButton = (Button) findViewById(R.id.loadNavActivity_btn);
+        headerBackButtons = (ImageView) findViewById(R.id.home_header_back);
 
         //initialize the songs list
         audioFilesOnDevice = new ArrayList<Audio>();
@@ -150,20 +146,21 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
                     new String[]{android.Manifest.permission.READ_EXTERNAL_STORAGE},
                     REQUEST_CODE_GESPLAYER_EXTERNAL_STORAGE);
         } else {
-            Log.d("onCreate: ", "permissions already granted");
+            Log.d(MAIN_LOG, "onCreate permissions already granted");
 
             //initiate device scan for audio files and create a list for them
-            loadAudio();
+            //loadAudio();
         }
 
         playPauseToggleButton.setOnClickListener(this);
         loadNavActivityButton.setOnClickListener(this);
-        Log.d("onCreate: ", "exited onCreate");
+        headerBackButtons.setOnClickListener(this);
+        Log.d(MAIN_LOG, "exited onCreate");
     }
     @Override
     protected void onStart() {
         super.onStart();
-        Log.d("onStart: ", "main activity onStart");
+        Log.d(MAIN_LOG, "onStart entered");
 
         //bind to the service again if it was created and started and the user is returning to app
         if(!MediaPlaybackService.isServiceStarted)
@@ -173,7 +170,7 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
                     mediaBrowserCallbacks, getIntent().getExtras());
             gesMediaBrowser.connect();
         }
-        Log.d("onStart: ", "main activity onStart finished");
+        Log.d(MAIN_LOG, "onStart exited");
     }
     @Override
     protected void onStop() {
@@ -181,41 +178,32 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
         /* disconnect the media browser from the service and unregister
         * the media controller callback but do not stop background music from playing
         * this way we can use other apps but still listen to the audio playback */
-        Log.d("onStop: ", "onStop was called");
+        Log.d(MAIN_LOG, "onStop entered");
         if (gesMediaController != null) {
             gesMediaController.unregisterCallback(mediaControllerCallbacks);
-            Log.d("onStop: ", "control callback unregistered");
+            Log.d(MAIN_LOG, "control callback unregistered");
         }
         gesMediaBrowser.disconnect();
         if(gesMediaBrowser.isConnected()){
-            Log.d("onStop: ", "mediaBrowser is somehow still connected");
+            Log.d(MAIN_LOG, "mediaBrowser is somehow still connected");
         }
-        Log.d("onStop: ", "onStop exited");
+        Log.d(MAIN_LOG, "onStop exited");
     }
     @Override
     protected void onDestroy() {
         super.onDestroy();
-        Log.d("onDestroy: ", "entered onDestroy");
-        gesPlaybackTransportControls.stop();
+        Log.d(MAIN_LOG, "entered onDestroy");
+        //gesPlaybackTransportControls.stop();
 
         gesMediaBrowser.disconnect();
-        gesMediaBrowser = null;
-        Log.d("onDestroy: ", "exited onDestroy");
+        //gesMediaBrowser = null;
+        Log.d(MAIN_LOG, "exited onDestroy");
     }
     @Override
     public void onBackPressed(){
-        /*if(MediaPlaybackService.isServiceStarted){
-            Toast.makeText(this, "onBackPressed: true", Toast.LENGTH_SHORT).show();
-            Log.d("onBackPressed: ", "true");
-            //super.onBackPressed();
-            super.onBackPressed();
-        }
-        else{
-            Toast.makeText(this, "onBackPressed: false", Toast.LENGTH_SHORT).show();
-            Log.d("onBackPressed: ", "false");
-            super.onBackPressed();
-            //onDestroy();
-        }*/
+        Intent goBackIntent = NavUtils.getParentActivityIntent(this);
+        goBackIntent.addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP);
+        NavUtils.navigateUpTo(this, goBackIntent);
     }
 
 
@@ -240,6 +228,13 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
                 startActivity(loadIntent);
                 break;
 
+            case R.id.home_header_back:
+                // Same as for onBackPressed()
+                Intent goBackIntent = NavUtils.getParentActivityIntent(this);
+                goBackIntent.addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP);
+                NavUtils.navigateUpTo(this, goBackIntent);
+                break;
+
             //space for future cases here
             //
             //
@@ -250,7 +245,7 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
 
     //-----------------------------------Audio file load methods----------------------------------//
 
-    private void loadAudio() {
+    /*private void loadAudio() {
         Log.d("loadAudio: ", "entered loadAudio");
         ContentResolver contentResolver = getContentResolver();
         String data, title, album, artist, albumArt;
@@ -296,7 +291,7 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
         }
 
         Log.d("loadAudio: ", "exited loadAudio");
-    }
+    }*/
 
 
 
@@ -309,7 +304,7 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
                 if (grantResults.length > 0
                         && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
                     Log.d("onRequestPermissions: ", "permissions granted for external storage");
-                    loadAudio();
+                    //loadAudio();
 
                     //initiate connection to the MediaPlaybackService through MediaBrowser
                     gesMediaBrowser = new MediaBrowserCompat(this,
