@@ -3,7 +3,6 @@ package com.ecebuc.gesmediaplayer;
 import android.content.ComponentName;
 import android.content.Context;
 import android.content.Intent;
-import android.content.pm.PackageManager;
 import android.graphics.Bitmap;
 import android.os.RemoteException;
 import android.provider.ContactsContract;
@@ -20,15 +19,12 @@ import android.view.animation.Animation;
 import android.view.animation.AnimationUtils;
 import android.widget.Button;
 import android.widget.ImageView;
+import android.widget.MediaController;
 import android.widget.TextView;
-
-import com.ecebuc.gesmediaplayer.Audios.Audio;
-
-import java.util.ArrayList;
 
 public class MainActivity extends AppCompatActivity implements View.OnClickListener {
 
-    Button playPauseToggleButton;
+    ImageView playPauseToggleButton, nextButton, previousButton;
     ImageView headerBackButton, smallArtCover, mainArtCover;
     TextView currentSongTitle, currentArtistName;
 
@@ -100,9 +96,11 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
 
             switch( state.getState() ) {
                 case PlaybackStateCompat.STATE_PLAYING: {
+                    playPauseToggleButton.setImageResource(R.drawable.ic_pause_black_24dp);
                     break;
                 }
                 case PlaybackStateCompat.STATE_PAUSED: {
+                    playPauseToggleButton.setImageResource(R.drawable.ic_play_arrow_black_24dp);
                     break;
                 }
             }
@@ -123,7 +121,9 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
         Log.d(MAIN_LOG, "onCreate entered");
 
         //register all buttons and views
-        playPauseToggleButton = (Button) findViewById(R.id.playPause_btn);
+        playPauseToggleButton = (ImageView) findViewById(R.id.home_playPause);
+        nextButton = (ImageView)findViewById(R.id.home_next);
+        previousButton = (ImageView) findViewById(R.id.home_prev);
         headerBackButton = (ImageView) findViewById(R.id.home_header_back);
         smallArtCover = (ImageView) findViewById(R.id.home_header_albumCoverSmall);
         mainArtCover = (ImageView) findViewById(R.id.main_albumCoverLarge);
@@ -131,9 +131,9 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
         currentArtistName = (TextView) findViewById(R.id.home_header_artistName);
 
         playPauseToggleButton.setOnClickListener(this);
+        nextButton.setOnClickListener(this);
+        previousButton.setOnClickListener(this);
         headerBackButton.setOnClickListener(this);
-
-
 
         Log.d(MAIN_LOG, "exited onCreate");
     }
@@ -192,7 +192,7 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
     @Override
     public void onClick(View v) {
         switch (v.getId()){
-            case R.id.playPause_btn:
+            case R.id.home_playPause:
                 //has to be dealt with accordingly, based on the current state of mediaplayer
                 if( gesMediaController.getPlaybackState().getState() == PlaybackStateCompat.STATE_PAUSED ) {
                     gesPlaybackTransportControls.play();
@@ -200,6 +200,14 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
                 else if( gesMediaController.getPlaybackState().getState() == PlaybackStateCompat.STATE_PLAYING ) {
                         gesPlaybackTransportControls.pause();
                 }
+                break;
+
+            case R.id.home_next:
+                gesPlaybackTransportControls.skipToNext();
+                break;
+
+            case R.id.home_prev:
+                gesPlaybackTransportControls.skipToPrevious();
                 break;
 
             case R.id.home_header_back:
