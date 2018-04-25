@@ -120,9 +120,9 @@ public class HomeActivity extends AppCompatActivity
             // However, if we're being restored from a previous state,
             // then we don't need to do anything and should return or else
             // we could end up with overlapping fragments.
-            if (savedInstanceState != null) {
+            /*if (savedInstanceState != null) {
                 return;
-            }
+            }*/
 
             //request permissions for external storage
             if (ContextCompat.checkSelfPermission(this,
@@ -232,6 +232,18 @@ public class HomeActivity extends AppCompatActivity
                 this.moveTaskToBack(true);
             }
         }
+    }
+
+    @Override
+    public void onSaveInstanceState(Bundle savedInstanceState) {
+        savedInstanceState.putBoolean("ServiceState", MediaPlaybackService.isServiceStarted);
+       super.onSaveInstanceState(savedInstanceState);
+    }
+    @Override
+    public void onRestoreInstanceState(Bundle savedInstanceState) {
+        super.onRestoreInstanceState(savedInstanceState);
+        boolean isServiceStarted = savedInstanceState.getBoolean("ServiceState");
+        //serviceBound = savedInstanceState.getBoolean("ServiceState");
     }
 
     //------------------------------Toolbar & NavDrawer options & misc----------------------------//

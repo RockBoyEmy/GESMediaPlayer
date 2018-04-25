@@ -22,6 +22,7 @@ import android.widget.Toast;
 import com.ecebuc.gesmediaplayer.AudioUtils.SongAdapter;
 import com.ecebuc.gesmediaplayer.AudioUtils.StorageUtils;
 import com.ecebuc.gesmediaplayer.Audios.Audio;
+import com.ecebuc.gesmediaplayer.MediaPlaybackService;
 import com.ecebuc.gesmediaplayer.R;
 import com.ecebuc.gesmediaplayer.Utils.SimpleDividerItemDecoration;
 import com.ecebuc.gesmediaplayer.Utils.RecyclerTouchListener;
@@ -42,6 +43,7 @@ public class SongsFragment extends Fragment {
     public static final String BROADCAST_AUDIO_LOAD_COMPLETE = "com.ecebuc.gesmediaplayer.AudioLoadComplete";
     private final String SONG_FRAGMENT_LOG = "SongFragment: ";
     private final String IS_FRAGMENT_TYPE_DEFAULT_TAG = "isFragmentDefaultTag";
+    private final String SONG_BROADCAST_IS_ASYNC = "shouldPopulateListWhole";
     private String fragmentTitle;
 
     private final String fromAlbumIDParamTAG = "Album ID";
@@ -83,6 +85,11 @@ public class SongsFragment extends Fragment {
             //default behavior - display all device songs
             //will be done in onCreateView
             fragmentTitle = "All Songs";
+
+            //clear the service audioList because all device songs are about to be load
+            if(MediaPlaybackService.audioList != null){
+                MediaPlaybackService.audioList.clear();
+            }
         } else {
             //fragment was probably created from an album - handle accordingly
             paramAlbumID = args.getString(fromAlbumIDParamTAG);
@@ -124,8 +131,10 @@ public class SongsFragment extends Fragment {
             public void onClick(View view, int position) {
                 // If current fragment is created from an album notify service to reload songList
                 if(!paramIsFragmentDefault){
-                    Intent songUploadBroadcastIntent = new Intent(BROADCAST_AUDIO_LOAD_COMPLETE);
-                    getActivity().sendBroadcast(songUploadBroadcastIntent);
+                    //tell service to load songs from Shared Preferences because album was selected
+                    //Intent songUploadBroadcastIntent = new Intent(BROADCAST_AUDIO_LOAD_COMPLETE);
+                    //songUploadBroadcastIntent.putExtra(SONG_BROADCAST_IS_ASYNC, false);
+                    //getActivity().sendBroadcast(songUploadBroadcastIntent);
                 }
                 songFragmentCallback.playSelectedSong(position);
             }
@@ -215,6 +224,10 @@ public class SongsFragment extends Fragment {
         // Upload songs, but do not broadcast, will be done onClick
         storageUtils.clearCachedAudioPlaylist();
         storageUtils.storeAudio(songList);
+
+        Intent i = new Intent(BROADCAST_AUDIO_LOAD_COMPLETE);
+        i.putExtra(SONG_BROADCAST_IS_ASYNC, false);
+        getActivity().sendBroadcast(i);
     }
     private void initSongAsyncTask(SongLoaderAsync songLoader){
         ContentResolver contentResolver = getActivity().getContentResolver();
@@ -245,7 +258,7 @@ public class SongsFragment extends Fragment {
         ContentResolver contentResolver;
         String data, title, album, artist, albumArt, id, albumId;
         int position, countBeforeSongUpload;
-        final int TIMES_BEFORE_UPLOAD = 70;
+        final int TIMES_BEFORE_UPLOAD = 30;
 
         public SongLoaderAsync(RecyclerView.Adapter adapter) {
             recyclerAdapter = adapter;
@@ -256,7 +269,6 @@ public class SongsFragment extends Fragment {
 
         @Override
         protected Void doInBackground(Cursor... passedCursor) {
-
             if (passedCursor[0] != null && passedCursor[0].getCount() > 0) {
                 while (passedCursor[0].moveToNext()) {
                     id = passedCursor[0].getString(passedCursor[0].getColumnIndex(MediaStore.Audio.Media._ID));
@@ -274,17 +286,20 @@ public class SongsFragment extends Fragment {
                     albumArtCursor.moveToFirst();
                     albumArt = albumArtCursor.getString(albumArtCursor.getColumnIndex(MediaStore.Audio.Albums.ALBUM_ART));
 
+                    //create new Audio object and put it individually in SharedPreferences
+                    //using the position variable as identifier for it
                     position++;
-                    publishProgress(new Audio(data, id, title, album, artist, albumArt));
+                    Audio newSong = new Audio(data, id, title, album, artist, albumArt);
+                    publishProgress(newSong);
+                    storageUtils.storeSingleAudio(newSong, position);
 
                     //periodically check if a cancel command was given, to exit rapidly
                     if(isCancelled())break;
 
                     //add some items to songList, upload to SharedPreferences and reset counter
                     if(countBeforeSongUpload == 0){
-                        storageUtils.clearCachedAudioPlaylist();
-                        storageUtils.storeAudio(songList);
                         Intent songUploadBroadcastIntent = new Intent(BROADCAST_AUDIO_LOAD_COMPLETE);
+                        songUploadBroadcastIntent.putExtra(SONG_BROADCAST_IS_ASYNC, true);
                         getActivity().sendBroadcast(songUploadBroadcastIntent);
                         countBeforeSongUpload = TIMES_BEFORE_UPLOAD;
                     }
@@ -305,9 +320,8 @@ public class SongsFragment extends Fragment {
         @Override
         protected void onPostExecute(Void aVoid) {
             // Upload song list one last time
-            storageUtils.clearCachedAudioPlaylist();
-            storageUtils.storeAudio(songList);
             Intent songUploadBroadcastIntent = new Intent(BROADCAST_AUDIO_LOAD_COMPLETE);
+            songUploadBroadcastIntent.putExtra(SONG_BROADCAST_IS_ASYNC, true);
             getActivity().sendBroadcast(songUploadBroadcastIntent);
         }
     }

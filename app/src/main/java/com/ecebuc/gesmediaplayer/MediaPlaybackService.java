@@ -52,10 +52,12 @@ public class MediaPlaybackService extends MediaBrowserServiceCompat implements
     private final String SERVICE_LOG = "GES SERVICE: ";
 
     private StorageUtils storageUtils;
-    private ArrayList<Audio> audioList;
+    public static ArrayList<Audio> audioList;
     private Audio activeAudio = null;
     private static int audioIndex = -1;
     private int pausedPosition;
+    private final String SONG_BROADCAST_IS_ASYNC = "shouldPopulateListWhole";
+
 
     private MediaPlayer gesMediaPlayer;
     private MediaSessionCompat gesMediaSession;
@@ -110,18 +112,6 @@ public class MediaPlaybackService extends MediaBrowserServiceCompat implements
         metadataBuilder.putString(MediaMetadataCompat.METADATA_KEY_TITLE, "Unknown song");
         metadataBuilder.putString(MediaMetadataCompat.METADATA_KEY_ARTIST, "Unknown artist");
         metadataBuilder.putString(MediaMetadataCompat.METADATA_KEY_ALBUM, "Unknown album");
-
-        //Notification icon in card
-        //metadataBuilder.putBitmap(MediaMetadataCompat.METADATA_KEY_DISPLAY_ICON, BitmapFactory.decodeResource(getResources(), R.mipmap.ic_launcher));
-        //metadataBuilder.putBitmap(MediaMetadataCompat.METADATA_KEY_ALBUM_ART, BitmapFactory.decodeResource(getResources(), R.mipmap.ic_launcher));
-
-        //lock screen icon for pre lollipop
-        //metadataBuilder.putBitmap(MediaMetadataCompat.METADATA_KEY_ART, BitmapFactory.decodeResource(getResources(), R.mipmap.ic_launcher));
-        //metadataBuilder.putString(MediaMetadataCompat.METADATA_KEY_DISPLAY_TITLE, "Display Title");
-        //metadataBuilder.putString(MediaMetadataCompat.METADATA_KEY_DISPLAY_SUBTITLE, "Display Subtitle");
-        //metadataBuilder.putLong(MediaMetadataCompat.METADATA_KEY_TRACK_NUMBER, 1);
-        //metadataBuilder.putLong(MediaMetadataCompat.METADATA_KEY_NUM_TRACKS, 1);
-
         gesMediaSession.setMetadata(metadataBuilder.build());
     }
     private void registerNoisyReceiver() {
@@ -184,6 +174,7 @@ public class MediaPlaybackService extends MediaBrowserServiceCompat implements
         super.onCreate();
 
         Log.d(SERVICE_LOG, "onCreate entered");
+        audioList = new ArrayList<Audio>();
         registerAudioLoadCompleteReceiver();
         initMediaPlayer();
         initMediaSession();
@@ -235,9 +226,6 @@ public class MediaPlaybackService extends MediaBrowserServiceCompat implements
         if (phoneStateListener != null) {
             telephonyManager.listen(phoneStateListener, PhoneStateListener.LISTEN_NONE);
         }
-
-        /*//clear cached playlist
-        //new StorageUtils(getApplicationContext()).clearCachedAudioPlaylist();*/
 
         gesMediaSession.release();
         unregisterReceiver(audioLoadComplete);
@@ -436,6 +424,13 @@ public class MediaPlaybackService extends MediaBrowserServiceCompat implements
 
             // Given this function is called, there should be a guarantee for .getInt
             if(audioIndex != -1){
+                //temporary loop to wait for audiolist to get repopulated after clear()
+                /*if(audioList.isEmpty()){
+                    Log.e(SERVICE_LOG, "onPlayFromMediaId: audioList is empty somehow");
+                    while (audioList.isEmpty()){
+                        Log.d(SERVICE_LOG, "audioList in service is still empty");
+                    }
+                }*/
                 activeAudio = audioList.get(audioIndex);
             }
             else {
@@ -578,18 +573,51 @@ public class MediaPlaybackService extends MediaBrowserServiceCompat implements
             }
         }
     };
-
+    
     private BroadcastReceiver audioLoadComplete = new BroadcastReceiver() {
         @Override
         public void onReceive(Context context, Intent intent) {
             Log.d(SERVICE_LOG, "entered audioLoadReceiver onReceive");
             storageUtils = new StorageUtils(getApplicationContext());
-            audioList = storageUtils.loadAudio();
-            if(audioList.isEmpty()){
-                Log.e("onReceive: ", "audioList is empty after loading");
-                //TODO: will have to handle scenario of no songs on device (app mustn't crash)
+
+            //check intent extras, and determine song load type
+            boolean isSongLoadAsync;
+            if(intent.getExtras() == null){
+                Log.e(SERVICE_LOG, "audioLoad onReceive intent has null extras");
                 return;
             }
+            else{
+                isSongLoadAsync = intent.getExtras().getBoolean(SONG_BROADCAST_IS_ASYNC);
+            }
+
+            //if songLoad is async, load/update songList only with the new songs
+            //otherwise, means there is only an album to be loaded on its own
+            if(!isSongLoadAsync){
+                //songs are taken from a selected album, so load whole list
+                //from Shared Preferences, it is short anyways
+                audioList = storageUtils.loadAudio();
+            }
+            else{
+                //calculate the current size of songList, start from last member, or from empty
+                //add the new songs one by one from the Shared Preferences where we left
+                int count;
+                if(!audioList.isEmpty()){
+                    count = audioList.size() - 1;
+                }
+                else{
+                    count = 0;
+                }
+
+                for(int i = count; ;i++){
+                    if (storageUtils.loadSingleAudio(i) != null) {
+                        audioList.add(storageUtils.loadSingleAudio(i));
+                    }
+                    else{
+                        break;
+                    }
+                }
+            }
+
             Log.d(SERVICE_LOG, "exited onReceive");
         }
     };
@@ -640,19 +668,19 @@ public class MediaPlaybackService extends MediaBrowserServiceCompat implements
         Log.d("createNotification: ", "playbackState is " + state.getState());
 
         //notification needs to be initialized - so it will initially be the pause icon
-        int playPauseNotificationIcon = R.drawable.ic_pause_black_24dp;/*android.R.drawable.ic_media_pause;*/
+        int playPauseNotificationIcon = R.drawable.ic_pause_black_24dp;
 
         //Build a new notification according to the current state of the MediaPlayer
         if(state.getState() == PlaybackStateCompat.STATE_PAUSED){
             Log.d("createNotification: ", "should be Paused");
-            playPauseNotificationIcon = R.drawable.ic_play_arrow_black_24dp;/*android.R.drawable.ic_media_play;*/
+            playPauseNotificationIcon = R.drawable.ic_play_arrow_black_24dp;
             playPauseSongIntent.setAction(ACTION_PLAY);
             playPauseSongPendingIntent = PendingIntent.getBroadcast(this, 0,
                                                                     playPauseSongIntent, 0);
 
         } if(state.getState() == PlaybackStateCompat.STATE_PLAYING){
             Log.d("createNotification: ", "should be Playing");
-            playPauseNotificationIcon = R.drawable.ic_pause_black_24dp;/*android.R.drawable.ic_media_pause*/
+            playPauseNotificationIcon = R.drawable.ic_pause_black_24dp;
             playPauseSongIntent.setAction(ACTION_PAUSE);
             playPauseSongPendingIntent = PendingIntent.getBroadcast(this, 0,
                                                                     playPauseSongIntent, 0);
@@ -677,7 +705,7 @@ public class MediaPlaybackService extends MediaBrowserServiceCompat implements
         notificationBuilder
                 // Enable launching the player by clicking the notification
                 //.setContentIntent(gesMediaSession.getController().getSessionActivity())
-                //.setContentIntent(clickActivityStart) //TODO doesn't work well for now, restarts, leaking receivers
+                .setContentIntent(clickActivityStart) //TODO doesn't work well for now, restarts, leaking receivers
 
                 // Make the transport controls visible on the lockscreen
                 .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)

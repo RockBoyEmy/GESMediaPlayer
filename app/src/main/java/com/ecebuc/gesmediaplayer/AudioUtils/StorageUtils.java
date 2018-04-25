@@ -27,8 +27,28 @@ public class StorageUtils {
         Gson gson = new Gson();
         String json = gson.toJson(arrayList);
         editor.putString("audioFilesArrayList", json);
-        editor.apply();
+        //editor.apply();
+        editor.commit();
+
     }
+
+    public void storeSingleAudio(Audio song, int positionId){
+        preferences = context.getSharedPreferences(STORAGE, Context.MODE_PRIVATE);
+        SharedPreferences.Editor editor = preferences.edit();
+        Gson gson = new Gson();
+        String singleJson = gson.toJson(song);
+        editor.putString(Integer.toString(positionId), singleJson);
+        editor.commit();
+    }
+    public Audio loadSingleAudio(int positionId){
+        preferences = context.getSharedPreferences(STORAGE, Context.MODE_PRIVATE);
+        Gson gson = new Gson();
+        String singleJson = preferences.getString(Integer.toString(positionId), null);
+        Type type = new TypeToken<Audio>() {
+        }.getType();
+        return gson.fromJson(singleJson, type);
+    }
+
     public ArrayList<Audio> loadAudio() {
         preferences = context.getSharedPreferences(STORAGE, Context.MODE_PRIVATE);
         Gson gson = new Gson();
