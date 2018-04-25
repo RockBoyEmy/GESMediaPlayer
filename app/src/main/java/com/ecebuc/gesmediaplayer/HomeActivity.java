@@ -2,6 +2,7 @@ package com.ecebuc.gesmediaplayer;
 
 import android.content.ComponentName;
 import android.content.Intent;
+import android.content.pm.ActivityInfo;
 import android.content.pm.PackageManager;
 import android.os.Bundle;
 import android.os.RemoteException;
@@ -112,6 +113,8 @@ public class HomeActivity extends AppCompatActivity
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_home);
+
+        setRequestedOrientation(ActivityInfo.SCREEN_ORIENTATION_PORTRAIT);
 
         Log.d(HOME_LOG, "onCreate entered");
         // Check that the activity is using the correct layout version for fragments

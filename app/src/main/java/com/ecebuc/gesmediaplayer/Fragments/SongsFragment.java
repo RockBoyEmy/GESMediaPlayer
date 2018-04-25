@@ -40,10 +40,10 @@ public class SongsFragment extends Fragment {
     private StorageUtils storageUtils;
     private SongLoaderAsync songLoader;
 
-    public static final String BROADCAST_AUDIO_LOAD_COMPLETE = "com.ecebuc.gesmediaplayer.AudioLoadComplete";
+    public static final String BROADCAST_AUDIO_LOAD_ASYNC_COMPLETE = "com.ecebuc.gesmediaplayer.LoadAsyncComplete";
+    public static final String BROADCAST_AUDIO_LOAD_COMPLETE = "com.ecebuc.gesmediaplayer.LoadComplete";
     private final String SONG_FRAGMENT_LOG = "SongFragment: ";
     private final String IS_FRAGMENT_TYPE_DEFAULT_TAG = "isFragmentDefaultTag";
-    private final String SONG_BROADCAST_IS_ASYNC = "shouldPopulateListWhole";
     private String fragmentTitle;
 
     private final String fromAlbumIDParamTAG = "Album ID";
@@ -132,9 +132,8 @@ public class SongsFragment extends Fragment {
                 // If current fragment is created from an album notify service to reload songList
                 if(!paramIsFragmentDefault){
                     //tell service to load songs from Shared Preferences because album was selected
-                    //Intent songUploadBroadcastIntent = new Intent(BROADCAST_AUDIO_LOAD_COMPLETE);
-                    //songUploadBroadcastIntent.putExtra(SONG_BROADCAST_IS_ASYNC, false);
-                    //getActivity().sendBroadcast(songUploadBroadcastIntent);
+                    Intent songUploadBroadcastIntent = new Intent(BROADCAST_AUDIO_LOAD_COMPLETE);
+                    getActivity().sendBroadcast(songUploadBroadcastIntent);
                 }
                 songFragmentCallback.playSelectedSong(position);
             }
@@ -224,10 +223,6 @@ public class SongsFragment extends Fragment {
         // Upload songs, but do not broadcast, will be done onClick
         storageUtils.clearCachedAudioPlaylist();
         storageUtils.storeAudio(songList);
-
-        Intent i = new Intent(BROADCAST_AUDIO_LOAD_COMPLETE);
-        i.putExtra(SONG_BROADCAST_IS_ASYNC, false);
-        getActivity().sendBroadcast(i);
     }
     private void initSongAsyncTask(SongLoaderAsync songLoader){
         ContentResolver contentResolver = getActivity().getContentResolver();
@@ -298,8 +293,7 @@ public class SongsFragment extends Fragment {
 
                     //add some items to songList, upload to SharedPreferences and reset counter
                     if(countBeforeSongUpload == 0){
-                        Intent songUploadBroadcastIntent = new Intent(BROADCAST_AUDIO_LOAD_COMPLETE);
-                        songUploadBroadcastIntent.putExtra(SONG_BROADCAST_IS_ASYNC, true);
+                        Intent songUploadBroadcastIntent = new Intent(BROADCAST_AUDIO_LOAD_ASYNC_COMPLETE);
                         getActivity().sendBroadcast(songUploadBroadcastIntent);
                         countBeforeSongUpload = TIMES_BEFORE_UPLOAD;
                     }
@@ -320,8 +314,7 @@ public class SongsFragment extends Fragment {
         @Override
         protected void onPostExecute(Void aVoid) {
             // Upload song list one last time
-            Intent songUploadBroadcastIntent = new Intent(BROADCAST_AUDIO_LOAD_COMPLETE);
-            songUploadBroadcastIntent.putExtra(SONG_BROADCAST_IS_ASYNC, true);
+            Intent songUploadBroadcastIntent = new Intent(BROADCAST_AUDIO_LOAD_ASYNC_COMPLETE);
             getActivity().sendBroadcast(songUploadBroadcastIntent);
         }
     }

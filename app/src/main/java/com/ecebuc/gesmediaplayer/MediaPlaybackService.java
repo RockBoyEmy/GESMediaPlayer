@@ -8,12 +8,10 @@ import android.content.ComponentName;
 import android.content.Context;
 import android.content.Intent;
 import android.content.IntentFilter;
-import android.content.res.AssetFileDescriptor;
 import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
 import android.media.AudioManager;
 import android.media.MediaPlayer;
-import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
 import android.os.PowerManager;
@@ -56,8 +54,6 @@ public class MediaPlaybackService extends MediaBrowserServiceCompat implements
     private Audio activeAudio = null;
     private static int audioIndex = -1;
     private int pausedPosition;
-    private final String SONG_BROADCAST_IS_ASYNC = "shouldPopulateListWhole";
-
 
     private MediaPlayer gesMediaPlayer;
     private MediaSessionCompat gesMediaSession;
@@ -119,10 +115,14 @@ public class MediaPlaybackService extends MediaBrowserServiceCompat implements
         IntentFilter noisyFilter = new IntentFilter(AudioManager.ACTION_AUDIO_BECOMING_NOISY);
         registerReceiver(becomingNoisyReceiver, noisyFilter);
     }
-    private void registerAudioLoadCompleteReceiver() {
-        //Register playNewAudio receiver
+    private void registerAudioLoadReceiver() {
         IntentFilter filter = new IntentFilter(SongsFragment.BROADCAST_AUDIO_LOAD_COMPLETE);
         registerReceiver(audioLoadComplete, filter);
+    }
+    private void registerAudioLoadAsyncReceiver() {
+        //Register playNewAudio receiver
+        IntentFilter filter = new IntentFilter(SongsFragment.BROADCAST_AUDIO_LOAD_ASYNC_COMPLETE);
+        registerReceiver(audioLoadAsyncComplete, filter);
     }
     private void registerNotificationCommandReceiver(){
         IntentFilter notificationFilter = new IntentFilter();
@@ -175,7 +175,8 @@ public class MediaPlaybackService extends MediaBrowserServiceCompat implements
 
         Log.d(SERVICE_LOG, "onCreate entered");
         audioList = new ArrayList<Audio>();
-        registerAudioLoadCompleteReceiver();
+        registerAudioLoadReceiver();
+        registerAudioLoadAsyncReceiver();
         initMediaPlayer();
         initMediaSession();
         initMediaSessionMetadata();
@@ -227,15 +228,10 @@ public class MediaPlaybackService extends MediaBrowserServiceCompat implements
             telephonyManager.listen(phoneStateListener, PhoneStateListener.LISTEN_NONE);
         }
 
+        gesMediaPlayer.release();
         gesMediaSession.release();
+        unregisterReceiver(audioLoadAsyncComplete);
         unregisterReceiver(audioLoadComplete);
-
-        /*handle app crash when it is started but no music is played, as
-        * the broadcast receiver is never being registered, giving error
-        * when entering onDestroy with an unregistered receiver*/
-        if(isServiceStarted){
-            unregisterReceiver(notificationPlaybackCommand);
-        }
         Log.d(SERVICE_LOG, "onDestroy entered, everything was unregistered and cleared...");
     }
 
@@ -407,6 +403,12 @@ public class MediaPlaybackService extends MediaBrowserServiceCompat implements
             AudioManager am = (AudioManager) getSystemService(Context.AUDIO_SERVICE);
             am.abandonAudioFocus(MediaPlaybackService.this);
 
+            if(gesMediaSession.getController().getPlaybackState().getState() == PlaybackStateCompat.STATE_PLAYING){
+                unregisterReceiver(becomingNoisyReceiver);
+            }
+            if(isServiceStarted){
+                unregisterReceiver(notificationPlaybackCommand);
+            }
             stopSelf();
             isServiceStarted = false;
             gesMediaSession.setActive(false);
@@ -424,13 +426,6 @@ public class MediaPlaybackService extends MediaBrowserServiceCompat implements
 
             // Given this function is called, there should be a guarantee for .getInt
             if(audioIndex != -1){
-                //temporary loop to wait for audiolist to get repopulated after clear()
-                /*if(audioList.isEmpty()){
-                    Log.e(SERVICE_LOG, "onPlayFromMediaId: audioList is empty somehow");
-                    while (audioList.isEmpty()){
-                        Log.d(SERVICE_LOG, "audioList in service is still empty");
-                    }
-                }*/
                 activeAudio = audioList.get(audioIndex);
             }
             else {
@@ -573,51 +568,41 @@ public class MediaPlaybackService extends MediaBrowserServiceCompat implements
             }
         }
     };
-    
+
     private BroadcastReceiver audioLoadComplete = new BroadcastReceiver() {
         @Override
         public void onReceive(Context context, Intent intent) {
             Log.d(SERVICE_LOG, "entered audioLoadReceiver onReceive");
             storageUtils = new StorageUtils(getApplicationContext());
+            audioList = storageUtils.loadAudio();
+            Log.d(SERVICE_LOG, "exited onReceive");
+        }
+    };
 
-            //check intent extras, and determine song load type
-            boolean isSongLoadAsync;
-            if(intent.getExtras() == null){
-                Log.e(SERVICE_LOG, "audioLoad onReceive intent has null extras");
-                return;
+    private BroadcastReceiver audioLoadAsyncComplete = new BroadcastReceiver() {
+        @Override
+        public void onReceive(Context context, Intent intent) {
+            Log.d(SERVICE_LOG, "entered audioLoadAsyncReceiver onReceive");
+            storageUtils = new StorageUtils(getApplicationContext());
+
+            //calculate the current size of songList, start from last member, or from empty
+            //add the new songs one by one from the Shared Preferences where we left
+            int count;
+            if(!audioList.isEmpty()){
+                count = audioList.size() - 1;
             }
             else{
-                isSongLoadAsync = intent.getExtras().getBoolean(SONG_BROADCAST_IS_ASYNC);
+                count = 0;
             }
 
-            //if songLoad is async, load/update songList only with the new songs
-            //otherwise, means there is only an album to be loaded on its own
-            if(!isSongLoadAsync){
-                //songs are taken from a selected album, so load whole list
-                //from Shared Preferences, it is short anyways
-                audioList = storageUtils.loadAudio();
-            }
-            else{
-                //calculate the current size of songList, start from last member, or from empty
-                //add the new songs one by one from the Shared Preferences where we left
-                int count;
-                if(!audioList.isEmpty()){
-                    count = audioList.size() - 1;
+            for(int i = count; ;i++){
+                if (storageUtils.loadSingleAudio(i) != null) {
+                    audioList.add(storageUtils.loadSingleAudio(i));
                 }
                 else{
-                    count = 0;
-                }
-
-                for(int i = count; ;i++){
-                    if (storageUtils.loadSingleAudio(i) != null) {
-                        audioList.add(storageUtils.loadSingleAudio(i));
-                    }
-                    else{
-                        break;
-                    }
+                    break;
                 }
             }
-
             Log.d(SERVICE_LOG, "exited onReceive");
         }
     };
@@ -693,8 +678,7 @@ public class MediaPlaybackService extends MediaBrowserServiceCompat implements
             largeIcon = BitmapFactory.decodeFile(activeAudio.getAlbumArt());
         }
 
-
-        //TODO this doesn't work for now - starting the activity when clicking the notification
+        //prepare to start the main activity when clicking on the notification
         Intent notificationClickIntent = new Intent(this, MainActivity.class);
         notificationClickIntent.setFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP | Intent.FLAG_ACTIVITY_NEW_TASK);
         PendingIntent clickActivityStart = PendingIntent.getActivity(this, 0,
@@ -704,8 +688,7 @@ public class MediaPlaybackService extends MediaBrowserServiceCompat implements
                 new NotificationCompat.Builder(this, CHANNEL_ID);
         notificationBuilder
                 // Enable launching the player by clicking the notification
-                //.setContentIntent(gesMediaSession.getController().getSessionActivity())
-                .setContentIntent(clickActivityStart) //TODO doesn't work well for now, restarts, leaking receivers
+                .setContentIntent(clickActivityStart)
 
                 // Make the transport controls visible on the lockscreen
                 .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
