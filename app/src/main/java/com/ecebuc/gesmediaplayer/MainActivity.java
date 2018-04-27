@@ -11,9 +11,11 @@ import android.support.v4.media.MediaBrowserCompat;
 import android.support.v4.media.MediaMetadataCompat;
 import android.support.v4.media.session.MediaControllerCompat;
 import android.support.v4.media.session.PlaybackStateCompat;
+import android.support.v4.view.GestureDetectorCompat;
 import android.support.v7.app.AppCompatActivity;
 import android.os.Bundle;
 import android.util.Log;
+import android.view.MotionEvent;
 import android.view.View;
 import android.view.animation.Animation;
 import android.view.animation.AnimationUtils;
@@ -22,11 +24,16 @@ import android.widget.ImageView;
 import android.widget.MediaController;
 import android.widget.TextView;
 
-public class MainActivity extends AppCompatActivity implements View.OnClickListener {
+import com.ecebuc.gesmediaplayer.Utils.OnSwipeListener;
+
+public class MainActivity extends AppCompatActivity implements View.OnClickListener,
+                                                                View.OnTouchListener{
 
     ImageView playPauseToggleButton, nextButton, previousButton;
     ImageView headerBackButton, smallArtCover, mainArtCover;
     TextView currentSongTitle, currentArtistName;
+
+    GestureDetectorCompat gestureDetector;
 
     private final String MAIN_LOG = "MAIN ACTIVITY: ";
 
@@ -135,6 +142,39 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
         previousButton.setOnClickListener(this);
         headerBackButton.setOnClickListener(this);
 
+        //for implementing the swipe gestures on Main Activity
+        gestureDetector = new GestureDetectorCompat(this, new OnSwipeListener(){
+            @Override
+            public boolean onSwipe(Direction direction) {
+                if(direction == Direction.left){
+                    gesPlaybackTransportControls.skipToNext();
+                }
+
+                if(direction == Direction.right){
+                    gesPlaybackTransportControls.skipToPrevious();
+                }
+                /*if (direction==Direction.up){
+                }
+                if (direction==Direction.down){
+                }*/
+                return true;
+            }
+
+            @Override
+            public boolean onDoubleTap(MotionEvent e){
+                if( gesMediaController.getPlaybackState().getState() == PlaybackStateCompat.STATE_PAUSED ) {
+                    gesPlaybackTransportControls.play();
+                }
+                else if( gesMediaController.getPlaybackState().getState() == PlaybackStateCompat.STATE_PLAYING ) {
+                    gesPlaybackTransportControls.pause();
+                }
+                //return true;
+                return super.onDoubleTap(e);
+            }
+        });
+        mainArtCover.setOnTouchListener(this);
+
+
         Log.d(MAIN_LOG, "exited onCreate");
     }
     @Override
@@ -222,6 +262,13 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
             //
         }
     }
+    @Override
+    public boolean onTouch(View v, MotionEvent event) {
+        Log.d(MAIN_LOG, "onTouch: ");
+        gestureDetector.onTouchEvent(event);
+        return true;
+    }
+
 
     public static void ImageViewAnimatedChange(Context c, final ImageView v, final Bitmap new_image) {
         final Animation anim_out = AnimationUtils.loadAnimation(c, android.R.anim.fade_out);
